@@ -40,9 +40,6 @@ else
 	$_SESSION["mode"]	= "cli";
 }
 
-// Connect to the MySQL database
-include("database.php");
-
 
 // force debugging on for all users + scripts
 // (note: debugging can be enabled on a per-user basis by an admin via the web interface)
