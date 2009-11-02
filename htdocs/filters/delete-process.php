@@ -1,10 +1,10 @@
 <?php
 /*
-	customers/delete-process.php
+	filters/delete-process.php
 
-	access: customers_write
+	access: filters_write
 
-	Deletes a customer provided that the customer has not been added to any invoices or time groups.
+	Deletes an unwanted filter.
 */
 
 // includes
@@ -12,23 +12,22 @@ require("../include/config.php");
 require("../include/amberphplib/main.php");
 
 // custom includes
-require("../include/customers/inc_customers.php");
+require("../include/application/inc_filters.php");
 
 
-if (user_permissions_get('customers_write'))
+if (user_permissions_get("filters_write"))
 {
-	$obj_customer = New customer;
+	$obj_filter = New filters;
 
 
 	/*
 		Load POST data
 	*/
 
-	$obj_customer->id		= security_form_input_predefined("int", "id_customer", 1, "");
-
+	$obj_filter->id			= security_form_input_predefined("int", "id_filter", 1, "");
 
 	// these exist to make error handling work right
-	$data["name_customer"]		= security_form_input_predefined("any", "name_customer", 0, "");
+	$data["title"]			= security_form_input_predefined("any", "title", 0, "");
 
 	// confirm deletion
 	$data["delete_confirm"]		= security_form_input_predefined("any", "delete_confirm", 1, "You must confirm the deletion");
@@ -40,17 +39,10 @@ if (user_permissions_get('customers_write'))
 	*/
 
 
-	// make sure the customer actually exists
-	if (!$obj_customer->verify_id())
+	// make sure the filter actually exists
+	if (!$obj_filter->verify_id())
 	{
-		log_write("error", "process", "The customer you have attempted to edit - ". $obj_customer->id ." - does not exist in this system.");
-	}
-
-
-	// check if the customer can be safely deleted
-	if ($obj_customer->check_delete_lock())
-	{
-		log_write("error", "process", "This customer can not be removed because their account has invoices or time groups belonging to it.");
+		log_write("error", "process", "The filter you have attempted to delete - ". $obj_filter->id ." - does not exist in this system.");
 	}
 
 	
@@ -58,23 +50,23 @@ if (user_permissions_get('customers_write'))
 	// return to the input page in the event of an error
 	if ($_SESSION["error"]["message"])
 	{	
-		$_SESSION["error"]["form"]["customer_delete"] = "failed";
-		header("Location: ../index.php?page=customers/delete.php&id=". $obj_customer->id);
+		$_SESSION["error"]["form"]["filter_delete"] = "failed";
+		header("Location: ../index.php?page=filters/delete.php&id=". $obj_filter->id);
 		exit(0);
 	}
 
 
 
 	/*
-		Delete Customer
+		Delete Filter
 	*/
 
-	// delete customer
-	$obj_customer->action_delete();
+	// delete filter
+	$obj_filter->action_delete();
 
 
-	// return to customers list
-	header("Location: ../index.php?page=customers/customers.php");
+	// return to filters list
+	header("Location: ../index.php?page=filters/filters.php");
 	exit(0);
 	
 }

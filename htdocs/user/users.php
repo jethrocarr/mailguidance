@@ -97,6 +97,11 @@ class page_output
 			$structure["id"]["column"]	= "id";
 			$this->obj_table->add_link("tbl_lnk_permissions", "user/user-permissions.php", $structure);
 
+			// delete link
+			$structure = NULL;
+			$structure["id"]["column"]	= "id";
+			$this->obj_table->add_link("tbl_lnk_delete", "user/user-delete.php", $structure);
+
 
 			// display the table
 			$this->obj_table->render_table_html();

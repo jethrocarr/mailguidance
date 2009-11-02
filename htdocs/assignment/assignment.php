@@ -2,7 +2,9 @@
 /*
 	assignment/assignment.php
 
-	access: assignment_read
+	access:
+		assignment_read		(Read-only - just displays configuration)
+		assignment_write	(Writable - shows form for enabling/disabling filters for users)
 
 	Draws a table/form showing all users cross referenced with filters
 	to allow configuration.
@@ -84,14 +86,6 @@ class page_output
 			$this->obj_table->columns[] = $data_users["id"];
 		}
 
-//		$this->obj_table->add_column("standard", "type", "filter_types.type");
-//		$this->obj_table->add_column("standard", "value", "filters.value");
-
-		// defaults
-//		$this->obj_table->columns			= array("title", "type", "value");
-//		$this->obj_table->columns_order		= array("title");
-//		$this->obj_table->columns_order_options	= array("title", "type", "value");
-
 		// define SQL structure
 		$this->obj_table->sql_obj->prepare_sql_settable("filters");
 		$this->obj_table->sql_obj->prepare_sql_addfield("id", "filters.id");
@@ -110,27 +104,6 @@ class page_output
 		// fetch filter data
 		$this->obj_table->generate_sql();
 		$this->obj_table->load_data_sql();
-
-
-		// fill in fields
-		/*
-		for ($i=0; $i < $this->obj_table->data_num_rows; $i++)
-		{
-			// run through all the users
-			foreach ($this->obj_sql_users->data as $data_user)
-			{
-				$this->obj_table->data[$i][ $data_user["id"] ] = "N";
-
-				if ($mapping_users_filters[ $data_user["id"] ])
-				{
-					if (in_array($this->obj_table->data[$i]["id"], $mapping_users_filters[ $data_user["id"] ]))
-					{
-						$this->obj_table->data[$i][ $data_user["id"] ] = "Y";
-					}
-				}
-			}
-		}
-		*/
 
 		// process table data
 		$this->obj_table->render_table_prepare();
@@ -180,6 +153,45 @@ class page_output
 		}
 
 
+		// hidden fields
+		//
+		// These fields are used to pass back the IDs of the filters and users
+		// that have been processed.
+		//
+		// We need to do this, so that when the user makes an adjustment on a page that
+		// has been filtered to only show some users/filters we will ignore any other
+		// users/filters when we apply the changes.
+		//
+		$structure = NULL;
+		$structure["fieldname"] 	= "users";
+		$structure["type"]		= "hidden";
+		
+		foreach ($this->obj_table->columns as $column)
+		{
+			if ($column != "filter_title")
+			{
+				$list_users[] = $column;
+			}
+		}
+		
+		$structure["defaultvalue"]	= format_arraytocommastring($list_users);
+		$this->obj_form->add_input($structure);
+
+
+		$structure = NULL;
+		$structure["fieldname"] 	= "filters";
+		$structure["type"]		= "hidden";
+		
+		foreach ($this->obj_table->data as $data_table)
+		{
+			$list_filters[] = $data_table["id"];
+		}
+		
+		$structure["defaultvalue"]	= format_arraytocommastring($list_filters);
+		$this->obj_form->add_input($structure);
+
+
+
 		// submit button
 		$structure = NULL;
 		$structure["fieldname"] 	= "submit";
@@ -199,11 +211,9 @@ class page_output
 	function render_html()
 	{
 		print "<h3>FILTER ASSIGNMENT</h3><br>";
-		print "<p>This page allows you to configure the filter assignment for users all from a single interface.</p>";
-
+		print "<p>This page allows you to configure the filter assignment for users all from a single interface by checking filters on/off for specific users. If you want to simply disable all filters for a specific user, put the user into holiday mode.</p>";
 
 		$this->obj_table->render_options_form();
-//		$this->obj_table->render_table_html();
 
 
 		/*
@@ -238,7 +248,23 @@ class page_output
 				if ($column != "filter_title")
 				{
 					print "<td>";
-					$this->obj_form->render_field("user_". $column ."_filter_". $this->obj_table->data[$i]["id"]);
+
+					if (user_permissions_get("assignment_write"))
+					{
+						$this->obj_form->render_field("user_". $column ."_filter_". $this->obj_table->data[$i]["id"]);
+					}
+					else
+					{
+						if ($this->obj_form->structure["user_". $column ."_filter_". $this->obj_table->data[$i]["id"] ]["defaultvalue"] == "on")
+						{
+							print "<img src=\"images/icons/tick_16.gif\" alt=\"Y\">";
+						}
+						else
+						{
+							print "<img src=\"images/icons/cross_16.gif\" alt=\"N\">";
+						}
+					}
+
 					print "</td>";
 				}
 			}
@@ -251,12 +277,19 @@ class page_output
 
 
 		// SUBMIT
+		if (user_permissions_get("assignment_write"))
+		{
+			$this->obj_form->render_field("users");
+			$this->obj_form->render_field("filters");
 
-		print "<div align=\"right\">";
-
-		$this->obj_form->render_field("submit");
-
-		print "</div>";
+			print "<div align=\"right\">";
+			$this->obj_form->render_field("submit");
+			print "</div>";
+		}
+		else
+		{
+			format_msgbox("locked", "<p>If you wish to adjust the filter &lt;-&gt user assignement, you will need your administrator to give you assignment_write privillages</p>");
+		}
 
 		// end form
 		print "</form>";

@@ -93,10 +93,19 @@ class page_output
 		}
 		else
 		{
-			// details link
-			$structure = NULL;
-			$structure["id"]["column"]	= "id";
-			$this->obj_table_list->add_link("details", "filters/view.php", $structure);
+			if (user_permissions_get("filters_write"))
+			{
+				// details link
+				$structure = NULL;
+				$structure["id"]["column"]	= "id";
+				$this->obj_table_list->add_link("tbl_lnk_details", "filters/view.php", $structure);
+
+				// delete link
+				$structure = NULL;
+				$structure["id"]["column"]	= "id";
+				$this->obj_table_list->add_link("tbl_lnk_delete", "filters/delete.php", $structure);
+			}
+
 
 			// display the table
 			$this->obj_table_list->render_table_html();

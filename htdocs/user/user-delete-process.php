@@ -27,7 +27,7 @@ if (user_permissions_get('admin'))
 	
 	// make sure the user actually exists
 	$sql_obj		= New sql_query;
-	$sql_obj->string	= "SELECT id FROM `users` WHERE id='$id'";
+	$sql_obj->string	= "SELECT id FROM `users` WHERE id='$id' LIMIT 1";
 	$sql_obj->execute();
 	
 	if (!$sql_obj->num_rows())
@@ -64,14 +64,29 @@ if (user_permissions_get('admin'))
 
 		/*
 			Delete user permissions
-			(both access and staff permissions)
 		*/
 		
 		$sql_obj->string	= "DELETE FROM users_permissions WHERE userid='$id'";
 		$sql_obj->execute();
+
+
+
+		/*
+			Delete user options
+		*/
 				
-		$sql_obj->string	= "DELETE FROM users_permissions_staff WHERE userid='$id'";
+		$sql_obj->string	= "DELETE FROM users_options WHERE userid='$id'";
 		$sql_obj->execute();
+
+
+
+		/*
+			Delete user <-> filter assignments
+		*/
+
+		$sql_obj->string	= "DELETE FROM filters_users WHERE id_user='$id'";
+		$sql_obj->execute();
+
 
 
 		// end transaction
@@ -87,13 +102,6 @@ if (user_permissions_get('admin'))
 
 			$sql_obj->trans_commit();
 		}
-
-
-		/*
-			Delete Journal
-		*/
-		journal_delete_entire("users", $id);
-
 
 
 		// return to user list

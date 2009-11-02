@@ -1,66 +1,53 @@
 <?php
 /*
-	customers/delete.php
-	
-	access:	customers_write
+	filters/delete.
 
-	Allows an unwanted customer to be deleted.
+	access:	filters_write
+
+	Allows unwanted filters to be deleted.
 */
 
 
 // custom includes
+require("include/application/inc_filters.php");
 
 
 class page_output
 {
-	var $id;
 	var $obj_menu_nav;
 	var $obj_form;
-	var $obj_customer;
+	var $obj_fiter;
 
-	var $locked;		// hold locked status of customer
-
-	
 	function page_output()
 	{
-		die("stuff don't work here :-(");
-		// fetch variables
-		$this->id = security_script_input('/^[0-9]*$/', $_GET["id"]);
+		$this->obj_filter = New filters;
 
-		// create customer object
-		$this->obj_customer		= New customer;
-		$this->obj_customer->id		= $this->id;
+		// fetch variables
+		$this->obj_filter->id = security_script_input('/^[0-9]*$/', $_GET["id"]);
 
 
 		// define the navigiation menu
 		$this->obj_menu_nav = New menu_nav;
-
-		$this->obj_menu_nav->add_item("Customer's Details", "page=customers/view.php&id=". $this->id ."");
-		$this->obj_menu_nav->add_item("Customer's Journal", "page=customers/journal.php&id=". $this->id ."");
-		$this->obj_menu_nav->add_item("Customer's Invoices", "page=customers/invoices.php&id=". $this->id ."");
-		$this->obj_menu_nav->add_item("Customer's Services", "page=customers/services.php&id=". $this->id ."");
-		$this->obj_menu_nav->add_item("Delete Customer", "page=customers/delete.php&id=". $this->id ."", TRUE);
+		$this->obj_menu_nav->add_item("Filter Details", "page=filters/view.php&id=". $this->obj_filter->id ."");
+		$this->obj_menu_nav->add_item("Delete Filter", "page=filters/delete.php&id=". $this->obj_filter->id ."", TRUE);
 	}
 
 
 	function check_permissions()
 	{
-		return user_permissions_get('customers_write');
+		return user_permissions_get("filters_write");
 	}
 	
 
 	function check_requirements()
 	{
-		// check if the customer exists
-		if (!$this->obj_customer->verify_id())
+		// verify that filter exists
+		if (!$this->obj_filter->verify_id())
 		{
+			log_write("error", "page_output", "The requested filter (". $this->obj_filter->id .") does not exist - possibly the filter has been deleted.");
 			return 0;
 		}
-
-		// check if the customer can be deleted
-		$this->locked = $this->obj_customer->check_delete_lock();
-
-
+		
 		return 1;
 	}
 
@@ -71,26 +58,26 @@ class page_output
 		/*
 			Define form structure
 		*/
-		$this->obj_form = New form_input;
-		$this->obj_form->formname = "customer_delete";
-		$this->obj_form->language = $_SESSION["user"]["lang"];
+		$this->obj_form			= New form_input;
+		$this->obj_form->formname	= "filter_delete";
+		$this->obj_form->language	= $_SESSION["user"]["lang"];
 
-		$this->obj_form->action = "customers/delete-process.php";
+		$this->obj_form->action = "filters/delete-process.php";
 		$this->obj_form->method = "post";
 		
 
 		// general
 		$structure = NULL;
-		$structure["fieldname"] 	= "name_customer";
+		$structure["fieldname"] 	= "title";
 		$structure["type"]		= "text";
 		$this->obj_form->add_input($structure);
 
 
 		// hidden
 		$structure = NULL;
-		$structure["fieldname"] 	= "id_customer";
+		$structure["fieldname"] 	= "id_filter";
 		$structure["type"]		= "hidden";
-		$structure["defaultvalue"]	= $this->id;
+		$structure["defaultvalue"]	= $this->obj_filter->id;
 		$this->obj_form->add_input($structure);
 		
 		
@@ -98,14 +85,14 @@ class page_output
 		$structure = NULL;
 		$structure["fieldname"] 	= "delete_confirm";
 		$structure["type"]		= "checkbox";
-		$structure["options"]["label"]	= "Yes, I wish to delete this customer and realise that once deleted the data can not be recovered.";
+		$structure["options"]["label"]	= "Yes, I wish to delete this filter and realise that once deleted the data can not be recovered.";
 		$this->obj_form->add_input($structure);
 
 
 
 		// define submit field
 		$structure = NULL;
-		$structure["fieldname"] = "submit";
+		$structure["fieldname"]		= "submit";
 		$structure["type"]		= "submit";
 		$structure["defaultvalue"]	= "delete";
 				
@@ -114,20 +101,12 @@ class page_output
 
 		
 		// define subforms
-		$this->obj_form->subforms["customer_delete"]	= array("name_customer");
-		$this->obj_form->subforms["hidden"]		= array("id_customer");
-
-		if ($this->locked)
-		{
-			$this->obj_form->subforms["submit"]	= array();
-		}
-		else
-		{
-			$this->obj_form->subforms["submit"]	= array("delete_confirm", "submit");
-		}
+		$this->obj_form->subforms["filter_delete"]	= array("title");
+		$this->obj_form->subforms["hidden"]		= array("id_filter");
+		$this->obj_form->subforms["submit"]	= array("delete_confirm", "submit");
 		
 		// fetch the form data
-		$this->obj_form->sql_query = "SELECT name_customer FROM `customers` WHERE id='". $this->id ."' LIMIT 1";
+		$this->obj_form->sql_query = "SELECT title FROM `filters` WHERE id='". $this->obj_filter->id ."' LIMIT 1";
 		$this->obj_form->load_data();
 		
 	}
@@ -138,17 +117,12 @@ class page_output
 	{
 
 		// title/summary
-		print "<h3>DELETE CUSTOMER</h3><br>";
-		print "<p>This page allows you to delete an unwanted customers. Note that it is only possible to delete a customer if they do not belong to any invoices or time groups. If they do, you can not delete the customer, but instead you can disable the customer by setting the date_end field.</p>";
+		print "<h3>DELETE FILTER</h3><br>";
+		print "<p>This page allows you to delete an unwanted filter.</p>";
 
 
 		// display the form
 		$this->obj_form->render_form();
-		
-		if ($this->locked)
-		{
-			format_msgbox("locked", "<p>This customer can not be removed because their account has either subscribed services, invoices or time groups belonging to it.</p><p>If you wish to close this customer's account, use the Customer Details page and set the End Date field or remove the records preventing deletion.</p>");
-		}
 	}
 
 

@@ -2,7 +2,7 @@
 /*
 	filters/add.php
 
-	access: public
+	access:	filters_write
 
 	Form to add a new filter.
 */
@@ -14,7 +14,7 @@ class page_output
 
 	function check_permissions()
 	{
-		return user_permissions_get("public");
+		return user_permissions_get("filters_write");
 	}
 
 	function check_requirements()
@@ -42,7 +42,7 @@ class page_output
 		$this->obj_form->add_input($structure);
 		
 		$structure = NULL;
-		$structure = form_helper_prepare_dropdownfromdb("type", "SELECT id, type as label FROM filter_types");
+		$structure = form_helper_prepare_dropdownfromdb("type", "SELECT id, type as label FROM filter_types ORDER BY label");
 		$this->obj_form->add_input($structure);
 
 		$structure = NULL;

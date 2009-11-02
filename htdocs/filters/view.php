@@ -2,9 +2,8 @@
 /*
 	filters/view.php
 
-	access:
-		filters_read	Read-only
-		filters_write	Able to change the filters
+	access:		filters_read	<no access>
+			filters_write	Full Access
 
 	Shows all the details of the filter and allows it to be adjusted.
 */
@@ -39,7 +38,7 @@ class page_output
 
 	function check_permissions()
 	{
-		return user_permissions_get("filters_read");
+		return user_permissions_get("filters_write");
 	}
 
 
@@ -76,7 +75,7 @@ class page_output
 		$this->obj_form->add_input($structure);
 		
 		$structure = NULL;
-		$structure = form_helper_prepare_dropdownfromdb("type", "SELECT id, type as label FROM filter_types");
+		$structure = form_helper_prepare_dropdownfromdb("type", "SELECT id, type as label FROM filter_types ORDER BY label");
 		$this->obj_form->add_input($structure);
 
 		$structure = NULL;

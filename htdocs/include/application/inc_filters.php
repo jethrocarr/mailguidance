@@ -52,21 +52,52 @@ class filters
 	} // end of verify_id
 
 
-
 	/*
-		verify_unique
+		verify_unique_title
 
-		Check that the filter is unique - we don't care if there are duplicate
-		filter titles, but the filter logic should not be duplicated.
+		Check that the filter name is unique.
 
 		Results
 		0	Failure - filter already exists
 		1	Success - filter does not exist
 	*/
 
-	function verify_unique()
+	function verify_unique_title()
 	{
-		log_debug("inc_filters", "Executing verify_unique()");
+		log_debug("inc_filters", "Executing verify_unique_title()");
+
+		$sql_obj			= New sql_query;
+		$sql_obj->string		= "SELECT id FROM `filters` WHERE title='". $this->data["title"] ."' ";
+
+		if ($this->id)
+			$sql_obj->string	.= " AND id!='". $this->id ."'";
+
+		$sql_obj->string		.= " LIMIT 1";
+		$sql_obj->execute();
+
+		if ($sql_obj->num_rows())
+		{
+			return 0;
+		}
+		
+		return 1;
+
+	} // end of verify_unique_title
+
+
+	/*
+		verify_unique_logic
+
+		Check that the filter logic is unique.
+
+		Results
+		0	Failure - filter already exists
+		1	Success - filter does not exist
+	*/
+
+	function verify_unique_logic()
+	{
+		log_debug("inc_filters", "Executing verify_unique_logic()");
 
 		$sql_obj			= New sql_query;
 		$sql_obj->string		= "SELECT id FROM `filters` WHERE type='". $this->data["type"] ."' AND value='". $this->data["name_customer"] ."' ";
@@ -84,7 +115,7 @@ class filters
 		
 		return 1;
 
-	} // end of verify_unique
+	} // end of verify_unique_logic
 
 
 
@@ -272,10 +303,9 @@ class filters
 		/*
 			Delete Filter <-> User assignments
 		*/
-/* TODO		
-		$sql_obj->string	= "DELETE FROM customers_taxes WHERE customerid='". $this->id ."'";
+
+		$sql_obj->string	= "DELETE FROM filters_users WHERE id_filter='". $this->id ."'";
 		$sql_obj->execute();
-*/
 
 
 		/*

@@ -2,9 +2,10 @@
 /*
 	assignment/assignment_adjust-process.php
 
-	access:		assignment_write
+	access:
+			assignment_write
 
-	Applys changes that the user has selected to the assignment of users to filter rules.
+	Applies changes that the user has selected to the assignment of users to filter rules.
 */
 
 
@@ -17,19 +18,25 @@ if (user_permissions_get("assignment_write"))
 {
 	/*
 		Load POST data
+	*/
 
-		We need to run through all the filters and users that exist in order to get the new assignments
+	$list_users		= security_form_input("/^[0-9,\s]*$/", "users", 1, "");
+	$list_filters		= security_form_input("/^[0-9,\s]*$/", "filters", 1, "");
+
+
+	/*
+		Generate old and new filter mappings from POST data
 	*/
 
 	// fetch user list
 	$obj_sql_users			= New sql_query;
-	$obj_sql_users->string		= "SELECT id FROM users";
+	$obj_sql_users->string		= "SELECT id FROM users WHERE id IN ($list_users)";
 	$obj_sql_users->execute();
 	$obj_sql_users->fetch_array();
 
 	// fetch filter list
 	$obj_sql_filters		= New sql_query;
-	$obj_sql_filters->string	= "SELECT id FROM filters";
+	$obj_sql_filters->string	= "SELECT id FROM filters WHERE id IN ($list_filters)";
 	$obj_sql_filters->execute();
 	$obj_sql_filters->fetch_array();
 

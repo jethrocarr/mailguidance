@@ -2,7 +2,8 @@
 /*
 	filters/edit-process.php
 
-	access: public
+	access:
+			filters_write
 
 	Allows new filter rules to be added or exisiting filter rules to be adjusted
 */
@@ -15,7 +16,7 @@ require("../include/amberphplib/main.php");
 require("../include/application/inc_filters.php");
 
 
-if (user_permissions_get("filters_read"))
+if (user_permissions_get("filters_write"))
 {
 	$obj_filter = New filters;
 
@@ -45,9 +46,15 @@ if (user_permissions_get("filters_read"))
 		}
 	}
 
+	// ensure that the filter title/name is unique
+	if (!$obj_filter->verify_unique_title())
+	{
+		log_write("error", "process", "This filter name/title is already in use by another rule.");
+		error_flag_field("title");
+	}
 
-	// ensure that the filter rule is unique
-	if (!$obj_filter->verify_unique())
+	// ensure that the filter logic is unique
+	if (!$obj_filter->verify_unique_logic())
 	{
 		log_write("error", "process", "This filter logic already exists as part of another filter rule.");
 		error_flag_field("type");

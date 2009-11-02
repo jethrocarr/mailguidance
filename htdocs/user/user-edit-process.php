@@ -170,9 +170,6 @@ if (user_permissions_get('admin'))
 				$sql_obj->execute();
 			}
 
-			// update journal
-			journal_quickadd_event("users", $id, "Created user account.");
-
 
 			// commit/rollback
 			if ($_SESSION["error"]["message"])
@@ -245,9 +242,6 @@ if (user_permissions_get('admin'))
 			$sql_obj->string	= "INSERT INTO users_options (userid, name, value) VALUES ($id, 'concurrent_logins', '". $data["option_concurrent_logins"] ."')";
 			$sql_obj->execute();
 
-
-			// update journal
-			journal_quickadd_event("users", $id, "Updated user account settings.");
 
 
 			// commit/rollback

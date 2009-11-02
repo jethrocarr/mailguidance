@@ -113,9 +113,6 @@ if (user_permissions_get('admin'))
 		} // end of while
 
 
-		// update journal
-		journal_quickadd_event("users", $id, "Adjusted user permissions.");
-
 
 		// commit
 		if (error_check())
