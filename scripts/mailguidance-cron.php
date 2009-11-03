@@ -16,10 +16,13 @@ log_debug("main", "Starting mailguidance-cron.php");
 
 
 /*
-	Fetch archive configuration
+	Fetch mail handling configuration
 */
 $config["archive_filter_folders"]	= sql_get_singlevalue("SELECT value FROM config WHERE name='ARCHIVE_FILTER_FOLDERS' LIMIT 1");
 $config["archive_inbox_allmail"]	= sql_get_singlevalue("SELECT value FROM config WHERE name='ARCHIVE_INBOX_ALLMAIL' LIMIT 1");
+
+$config["mail_default_mode"]		= sql_get_singlevalue("SELECT value FROM config WHERE name='MAIL_DEFAULT_MODE' LIMIT 1");
+$config["mail_default_address"]		= sql_get_singlevalue("SELECT value FROM config WHERE name='MAIL_DEFAULT_ADDRESS' LIMIT 1");
 
 
 /*
@@ -47,6 +50,7 @@ if ($obj_sql_users->num_rows())
 
 	foreach ($obj_sql_users->data as $data_sql)
 	{
+		// create map of user ids to email addresses
 		$map_users_email[ $data_sql["id"] ] = $data_sql["contact_email"];
 	}
 }
@@ -74,8 +78,14 @@ if ($obj_sql_users_holiday->num_rows())
 	}
 }
 
-// TODO: solve recursiveness
 
+/*
+	TODO: solve recursiveness
+
+	If mail is re-directed from one user to another, but the destination user is also
+	going away, the re-direct will not be properly applied and some emails would
+	still be delivered to users who are away.
+*/
 
 
 
@@ -95,18 +105,23 @@ if ($obj_sql_filters_users->num_rows())
 
 	foreach ($obj_sql_filters_users->data as $data_sql)
 	{
+		// prep the arrays (prevents PHP warnings)
 		if (!$map_filters_users[ $data_sql["id_filter"] ])
 		{
 			$map_filters_users[ $data_sql["id_filter"] ] = array();
 		}
 
+
+		/*
+			Process holiday redirections
+		*/
 		if (in_array($data_sql["id_user"], $map_users_holiday))
 		{
 			log_debug("main", "User ". $data_sql["id_user"] ." is on holiday");
 
 			if ($map_users_holiday_redirect[ $data_sql["id_user"] ])
 			{
-				// redirect mail
+				// redirect emails by renaming the old user ID with the target userid
 				$data_sql["id_user"] = $map_users_holiday_redirect[ $data_sql["id_user"] ];
 				
 				log_debug("main", "Redirecting mail to user ". $data_sql["id_user"] ."");
@@ -123,7 +138,13 @@ if ($obj_sql_filters_users->num_rows())
 		}
 
 
-		// add user to the map (provided that they don't already exist)
+		/*
+			Add the user's email address to the filter, provided that they
+			don't already exist.
+
+			(Duplicate entries can occur when a user is on holiday and redirecting all
+			 their filters to another user)
+		*/
 		if (!in_array($data_sql["id_user"], $map_filters_users[ $data_sql["id_filter"] ]))
 		{
 			$map_filters_users[ $data_sql["id_filter"] ][] = $data_sql["id_user"];
@@ -165,8 +186,19 @@ if ($obj_sql_filters->num_rows())
 	{
 		log_debug("main", "Writing filter ". $data_filter["id"] ."");
 
+
+		// start filter rule
 		$procmail[] = "# ". $data_filter["title"] ."\n";
 		$procmail[] = ":0\n";
+
+		// fix value for use by rule logic - certain chars need to be escaped
+		$target		= array();
+		$replace	= array();
+
+		$target[]	= "/\[/";		$replace[]	= "\[";
+		$target[]	= "/\]/";		$replace[]	= "\]";
+
+		$data_filter["value"] = preg_replace($target, $replace, $data_filter["value"]);
 
 		// process filter type
 		switch ($data_filter["type"])
@@ -186,7 +218,7 @@ if ($obj_sql_filters->num_rows())
 
 		$procmail[] = "{\n";
 
-		// run through all mapped users for this filter
+		// add all mapped users for this filter
 		if ($map_filters_users[ $data_filter["id"] ])
 		{
 			foreach ($map_filters_users[ $data_filter["id"] ] as $id_user)
@@ -201,7 +233,26 @@ if ($obj_sql_filters->num_rows())
 		if ($config["archive_filter_folders"])
 		{
 			$procmail[] = "\t:0 c\n";
-			$procmail[] = "\t\"". $data_filter["title"] ."\"";
+			$procmail[] = "\t\"". $data_filter["title"] ."\"\n";
+			$procmail[] = "\t\n";
+		}
+
+
+		// finally either save mail to inbox, or delete
+		if ($config["archive_inbox_allmail"])
+		{
+			// if ARCHIVE_INBOX_ALLMAIL is set, save a copy in the main inbox
+
+			$procmail[] = "\t:0\n";
+			$procmail[] = "\t\$DEFAULT\n";
+			$procmail[] = "\t\n";
+		}
+		else
+		{
+			// mail has been processed, delete it to prevent
+			// any further processing.
+			$procmail[] = "\t:0\n";
+			$procmail[] = "\t/dev/null\n";
 			$procmail[] = "\t\n";
 		}
 
@@ -210,22 +261,67 @@ if ($obj_sql_filters->num_rows())
 }
 
 
+
 /*
 	Final catch all rules
+
+	These rules ONLY APPLY TO UNMATCHED EMAILS.
 */
 
-if ($config["archive_inbox_allmail"])
+
+// do inbox archiving if required
+if ($config["archive_inbox_allmail"] && $config["mail_default_mode"] != "inbox")
 {
-	// save a copy in the inbox
-	// this will happen by default, no need to write rules
-}
-else
-{
-	// we don't want to retain a copy
-	// direct it to /dev/null
-	$procmail[] = ":0\n";
-	$procmail[] = "/dev/null\n";
+	// the default mode is not to save in the inbox, but the archive options require
+	// saving email to the inbox.
+	//
+	// therefore, save to the inbox and then proceed with default rule.
+
+	$procmail[] = "# archive unmatched emails to inbox\n";
+	$procmail[] = ":0 c\n";
+	$procmail[] = "\$DEFAULT\n";
 	$procmail[] = "\n";
+}
+
+// process default mode rules
+switch ($config["mail_default_mode"])
+{
+	case "forward":
+		// forward email to another address
+		$procmail[] = "# forward unmatched mail\n";
+		$procmail[] = ":0\n";
+		$procmail[] = "! ". $config["mail_default_address"] ."\n";
+		$procmail[] = "\n";
+	break;
+
+	case "drop":
+		// we don't want to retain a copy, delete the mail
+		$procmail[] = "# delete unmatched mail\n";
+		$procmail[] = ":0\n";
+		$procmail[] = "/dev/null\n";
+		$procmail[] = "\n";
+	break;
+
+	case "everyone":
+		// send unmatched mail to all users
+		$procmail[] = "# send unmatched mail to all users\n";
+
+		foreach (array_keys($map_users_email) as $id_user)
+		{
+			$procmail[] = ":0 c\n";
+			$procmail[] = "! ". $map_users_email[ $id_user ] ."\n";
+		}
+
+		$procmail[] = "\n";
+		$procmail[] = ":0\n";
+		$procmail[] = "/dev/null\n";
+		$procmail[] = "\n";
+	break;
+
+	case "inbox":
+	default:
+		// nothing todo, the email will automatically land in the inbox by default
+	break;
 }
 
 
@@ -246,6 +342,7 @@ if (!$fh = fopen($_ENV["HOME"] ."/.procmailrc", "w"))
 fwrite($fh, "# Automatically generated by MailGuidance - do not manually adjust\n");
 fwrite($fh, "\n");
 fwrite($fh, "MAILDIR=\$HOME/mail\n");
+//fwrite($fh, "LOGFILE=\$HOME/.procmaillog\n");		// not much use, since it only shows mailbox changes, not forwards
 fwrite($fh, "\n");
 			        
 foreach ($procmail as $line)
@@ -258,7 +355,10 @@ fclose($fh);
 
 
 
-log_debug("main", "Completed mailguidance-cron.php");
+/*
+	Complete
+*/
 
+log_debug("main", "Completed mailguidance-cron.php");
 exit(0);
 

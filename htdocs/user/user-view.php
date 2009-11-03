@@ -112,6 +112,24 @@ class page_output
 		$structure["options"]["req"]	= "yes";
 		$this->obj_form->add_input($structure);
 
+
+		// holiday mode
+		$structure = NULL;
+		$structure["fieldname"]			= "holiday_mode";
+		$structure["type"]			= "checkbox";
+		$structure["options"]["req"]		= "yes";
+		$structure["options"]["label"]		= "Temporarly disable email delivery to your account (ideal for vacation/holidays)";
+		$this->obj_form->add_input($structure);
+		
+		$structure = NULL;
+		$structure = form_helper_prepare_dropdownfromdb("holiday_mode_redirect", "SELECT id, realname as label FROM users WHERE id!='". $this->id ."' ORDER BY realname");
+		$structure["options"]["prelabel"]	= "Whilst away, direct all my emails to: ";
+		$this->obj_form->add_input($structure);
+	
+		$this->obj_form->add_action("holiday_mode", "", "holiday_mode_redirect", "hide");
+		$this->obj_form->add_action("holiday_mode", "1", "holiday_mode_redirect", "show");
+
+
 		// passwords
 		$structure = NULL;
 		$structure["fieldname"]		= "password_message";
@@ -190,12 +208,27 @@ class page_output
 		
 		// define subforms
 		$this->obj_form->subforms["user_view"]		= array("id_user", "username", "realname", "contact_email");
+		$this->obj_form->subforms["user_holiday"]	= array("holiday_mode", "holiday_mode_redirect");
 		$this->obj_form->subforms["user_password"]	= array("password_message", "password", "password_confirm");
 		$this->obj_form->subforms["user_info"]		= array("time", "ipaddress");
 		$this->obj_form->subforms["user_options"]	= array("option_lang", "option_dateformat", "option_shrink_tableoptions", "option_debug", "option_concurrent_logins");
 		
 		$this->obj_form->subforms["submit"]		= array("submit");
 
+
+		// fetch holiday mode
+		$obj_sql		= New sql_query;
+		$obj_sql->string	= "SELECT id, id_user_redirect FROM users_holidaymode WHERE id_user='". $this->id ."' LIMIT 1";
+		$obj_sql->execute();
+
+		if ($obj_sql->num_rows())
+		{
+			$this->obj_form->structure["holiday_mode"]["defaultvalue"] = "enabled";
+
+			$obj_sql->fetch_array();
+
+			$this->obj_form->structure["holiday_mode_redirect"]["defaultvalue"] = $obj_sql->data[0]["id_user_redirect"];
+		}
 		
 		// fetch the form data
 		$this->obj_form->sql_query = "SELECT id, username, realname, contact_email, time, ipaddress FROM `users` WHERE id='". $this->id ."' LIMIT 1";

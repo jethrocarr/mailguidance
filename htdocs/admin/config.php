@@ -45,9 +45,10 @@ class page_output
 		$structure["type"]				= "radio";
 		$structure["options"]["prelabel"]		= "If an email does not match any of the configured filters, then:<br>";
 		$structure["options"]["no_translate_fieldname"]	= "yes";
-		$structure["values"]				= array("archive", "drop", "forward");
+		$structure["values"]				= array("archive", "everyone", "drop", "forward");
 		$structure["translations"]			= array("archive"	=> "Save email to user inbox",
 									"drop"		=> "Delete unmatched email",
+									"everyone"	=> "Send email to all users (excluding those on holiday)",
 									"forward"	=> "Forward email to another address");
 		$this->obj_form->add_input($structure);
 

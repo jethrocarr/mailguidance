@@ -47,6 +47,11 @@ if (user_permissions_get('admin'))
 	// account options are for edits only
 	if ($mode == "edit")
 	{
+		// holiday mode
+		$data["holiday_mode"]			= security_form_input_predefined("checkbox", "holiday_mode", 1, "");
+		$data["holiday_mode_redirect"]		= security_form_input_predefined("int", "holiday_mode_redirect", 0, "");
+
+		// general options
 		$data["option_lang"]			= security_form_input_predefined("any", "option_lang", 1, "");
 		$data["option_dateformat"]		= security_form_input_predefined("any", "option_dateformat", 1, "");
 		// $data["option_timezone"]		= security_form_input_predefined("any", "option_timezone", 1, "");
@@ -206,6 +211,23 @@ if (user_permissions_get('admin'))
 							."WHERE id='$id' LIMIT 1";
 
 			$sql_obj->execute();
+
+
+			/*
+				Update holiday mode settings
+			*/
+
+			// remove any exisitng holiday mode settings
+			$sql_obj->string	= "DELETE FROM users_holidaymode WHERE id_user='$id' LIMIT 1";
+			$sql_obj->execute();
+
+
+			// create new holiday mode settings if required
+			if ($data["holiday_mode"])
+			{
+				$sql_obj->string	= "INSERT INTO users_holidaymode (id_user, id_user_redirect) VALUES ('$id', '". $data["holiday_mode_redirect"] ."')";
+				$sql_obj->execute();
+			}
 
 
 

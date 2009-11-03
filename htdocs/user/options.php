@@ -94,7 +94,7 @@ class page_output
 		$this->obj_form->add_input($structure);
 		
 		$structure = NULL;
-		$structure = form_helper_prepare_dropdownfromdb("holiday_mode_redirect", "SELECT id, realname as label FROM users ORDER BY realname");
+		$structure = form_helper_prepare_dropdownfromdb("holiday_mode_redirect", "SELECT id, realname as label FROM users WHERE id!='". $this->id ."' ORDER BY realname");
 		$structure["options"]["prelabel"]	= "Whilst away, direct all my emails to: ";
 		$this->obj_form->add_input($structure);
 	
