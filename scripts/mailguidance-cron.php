@@ -308,8 +308,12 @@ switch ($config["mail_default_mode"])
 
 		foreach (array_keys($map_users_email) as $id_user)
 		{
-			$procmail[] = ":0 c\n";
-			$procmail[] = "! ". $map_users_email[ $id_user ] ."\n";
+			// exclude users who are on holiday
+			if (!in_array($id_user, $map_users_holiday))
+			{
+				$procmail[] = ":0 c\n";
+				$procmail[] = "! ". $map_users_email[ $id_user ] ."\n";
+			}
 		}
 
 		$procmail[] = "\n";

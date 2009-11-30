@@ -13,7 +13,7 @@ $GLOBALS["config"];
 	Database Configuration
 */
 $config["db_host"] = "localhost";			// hostname of the MySQL server
-$config["db_name"] = "myapp";				// database name
+$config["db_name"] = "mailguidance";			// database name
 $config["db_user"] = "root";				// MySQL user
 $config["db_pass"] = "";				// MySQL password (if any)
 
