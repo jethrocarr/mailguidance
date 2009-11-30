@@ -144,6 +144,9 @@ if (user_permissions_get("assignment_write"))
 
 
 	// commit
+	$sql_obj->string = "UPDATE config SET value='update_required' WHERE name='PROCMAIL_UPDATE_STATUS' LIMIT 1";
+	$sql_obj->execute();
+
 	if (error_check())
 	{
 		$sql_obj->trans_rollback();

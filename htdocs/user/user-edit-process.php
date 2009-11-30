@@ -267,6 +267,9 @@ if (user_permissions_get('admin'))
 
 
 			// commit/rollback
+			$sql_obj->string = "UPDATE config SET value='update_required' WHERE name='PROCMAIL_UPDATE_STATUS' LIMIT 1";
+			$sql_obj->execute();
+
 			if ($_SESSION["error"]["message"])
 			{
 				$sql_obj->trans_rollback();

@@ -88,6 +88,10 @@ if (user_permissions_get('admin'))
 		$sql_obj->execute();
 
 
+		// update configuration flag
+		$sql_obj->string = "UPDATE config SET value='update_required' WHERE name='PROCMAIL_UPDATE_STATUS' LIMIT 1";
+		$sql_obj->execute();
+
 
 		// end transaction
 		if ($_SESSION["error"]["message"])

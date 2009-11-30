@@ -15,6 +15,23 @@ require($config["app_path"] ."/htdocs/include/amberphplib/main.php");
 log_debug("main", "Starting mailguidance-cron.php");
 
 
+
+/*
+	Check if we need to update procmail rules
+
+	If there are no changes, would be a waste of resources to regenerate the file.
+*/
+
+if (sql_get_singlevalue("SELECT value FROM config WHERE name='PROCMAIL_UPDATE_STATUS' LIMIT 1") != "update_required")
+{
+	log_debug("main", "No need to update procmail rules");
+	exit(0);
+}
+	
+
+
+
+
 /*
 	Fetch mail handling configuration
 */
@@ -362,6 +379,9 @@ fclose($fh);
 /*
 	Complete
 */
+
+$sql_obj->string = "UPDATE config SET value='synced' WHERE name='PROCMAIL_UPDATE_STATUS' LIMIT 1";
+$sql_obj->execute();
 
 log_debug("main", "Completed mailguidance-cron.php");
 exit(0);

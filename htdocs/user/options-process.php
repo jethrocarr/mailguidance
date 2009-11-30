@@ -167,6 +167,10 @@ if (user_online())
 		/*
 			Complete
 		*/
+
+		$sql_obj->string = "UPDATE config SET value='update_required' WHERE name='PROCMAIL_UPDATE_STATUS' LIMIT 1";
+		$sql_obj->execute();
+
 		
 		if (!$_SESSION["error"]["message"])
 		{
