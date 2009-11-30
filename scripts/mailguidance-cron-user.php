@@ -19,13 +19,13 @@
 $GLOBALS["config"];
 
 // Install path of MailGuidance application
-$config["app_path"] = "/home/jethro/webapp_development/amberdms/mailguidance/cvs/mailguidance/";
+$config["app_path"] = "/usr/share/mailguidance";
 
 // Database Configuration
 $config["db_host"] = "localhost";			// hostname of the MySQL server
-$config["db_name"] = "mailguidance_devel";		// database name
+$config["db_name"] = "mailguidance";			// database name
 $config["db_user"] = "root";				// MySQL user
-$config["db_pass"] = "sdr05ynw4tuj";			// MySQL password (if any)
+$config["db_pass"] = "";				// MySQL password (if any)
 
 
 
