@@ -12,7 +12,6 @@ BuildArch: noarch
 BuildRequires: gettext
 Requires: httpd, mod_ssl
 Requires: php >= 5.1.6, mysql-server, php-mysql
-Requires: php-pear, php-pear-Mail-Mime
 Requires: perl, perl-DBD-MySQL
 Prereq: httpd, php, mysql-server, php-mysql
 
