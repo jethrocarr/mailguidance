@@ -89,12 +89,6 @@ class page_output
 
 		// general
 		$structure = NULL;
-		$structure["fieldname"] 	= "id_user";
-		$structure["type"]		= "text";
-		$structure["defaultvalue"]	= $this->id;
-		$this->obj_form->add_input($structure);
-		
-		$structure = NULL;
 		$structure["fieldname"] 	= "username";
 		$structure["type"]		= "input";
 		$structure["options"]["req"]	= "yes";
@@ -197,6 +191,13 @@ class page_output
 		$this->obj_form->add_input($structure);
 
 
+		// hidden
+		$structure = NULL;
+		$structure["fieldname"]		= "id_user";
+		$structure["type"]		= "hidden";
+		$structure["defaultvalue"]	= $this->id;
+		$this->obj_form->add_input($structure);
+
 	
 		// submit section
 		$structure = NULL;
@@ -207,12 +208,12 @@ class page_output
 		
 		
 		// define subforms
-		$this->obj_form->subforms["user_view"]		= array("id_user", "username", "realname", "contact_email");
+		$this->obj_form->subforms["user_view"]		= array("username", "realname", "contact_email");
 		$this->obj_form->subforms["user_holiday"]	= array("holiday_mode", "holiday_mode_redirect");
 		$this->obj_form->subforms["user_password"]	= array("password_message", "password", "password_confirm");
 		$this->obj_form->subforms["user_info"]		= array("time", "ipaddress");
 		$this->obj_form->subforms["user_options"]	= array("option_lang", "option_dateformat", "option_shrink_tableoptions", "option_debug", "option_concurrent_logins");
-		
+		$this->obj_form->subforms["hidden"]		= array("id_user");
 		$this->obj_form->subforms["submit"]		= array("submit");
 
 
