@@ -88,7 +88,7 @@ class page_output
 		$structure = NULL;
 		$structure["fieldname"] 	= "id_filter";
 		$structure["type"]		= "hidden";
-		$structure["defaultvalue"]	= $this->id;
+		$structure["defaultvalue"]	= $this->obj_filter->id;
 		$this->obj_form->add_input($structure);
 
 
@@ -96,7 +96,7 @@ class page_output
 		$structure = NULL;
 		$structure["fieldname"] 	= "submit";
 		$structure["type"]		= "submit";
-		$structure["defaultvalue"]	= "filter_add";
+		$structure["defaultvalue"]	= "submit";
 		$this->obj_form->add_input($structure);
 		
 
