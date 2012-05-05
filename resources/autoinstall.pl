@@ -209,11 +209,11 @@ print "DB installation complete!\n";
 ## 4. SETUP MAILGUIDANCE USER
 
 print "\n";
-print "You now need to setup a non-privillaged user to run the mailguidance\n";
+print "You now need to setup a non-privillaged user to run the MailGuidance\n";
 print "cronjob and also store archived emails.\n";
 print "\n";
 print "1. Copy /usr/share/mailguidance/scripts/mailguidance-cron-user.php to user's home directory.\n";
-print "2. Update MySQL DB settings - can use copy ones from /etc/mailguidance/config.php\n";
+print "2. Update MySQL DB settings - just need to copy ones from /etc/mailguidance/config.php\n";
 print "3. Setup crontab for user to execute script\n";
 print "4. Configure your mailserver to direct emails into this account\n";
 print "\n";
