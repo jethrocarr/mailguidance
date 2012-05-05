@@ -212,7 +212,7 @@ class page_output
 		$this->obj_form->subforms["user_holiday"]	= array("holiday_mode", "holiday_mode_redirect");
 		$this->obj_form->subforms["user_password"]	= array("password_message", "password", "password_confirm");
 		$this->obj_form->subforms["user_info"]		= array("time", "ipaddress");
-		$this->obj_form->subforms["user_options"]	= array("option_lang", "option_dateformat", "option_shrink_tableoptions", "option_debug", "option_concurrent_logins");
+		$this->obj_form->subforms["user_options"]	= array("option_lang", "option_dateformat", "option_debug");
 		$this->obj_form->subforms["hidden"]		= array("id_user");
 		$this->obj_form->subforms["submit"]		= array("submit");
 

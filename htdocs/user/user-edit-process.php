@@ -55,9 +55,9 @@ if (user_permissions_get('admin'))
 		$data["option_lang"]			= security_form_input_predefined("any", "option_lang", 1, "");
 		$data["option_dateformat"]		= security_form_input_predefined("any", "option_dateformat", 1, "");
 		// $data["option_timezone"]		= security_form_input_predefined("any", "option_timezone", 1, "");
-		$data["option_shrink_tableoptions"]	= security_form_input_predefined("any", "option_shrink_tableoptions", 0, "");
+		//$data["option_shrink_tableoptions"]	= security_form_input_predefined("any", "option_shrink_tableoptions", 0, "");
 		$data["option_debug"]			= security_form_input_predefined("any", "option_debug", 0, "");
-		$data["option_concurrent_logins"]	= security_form_input_predefined("any", "option_concurrent_logins", 0, "");
+		//$data["option_concurrent_logins"]	= security_form_input_predefined("any", "option_concurrent_logins", 0, "");
 	}
 
 
@@ -253,16 +253,16 @@ if (user_permissions_get('admin'))
 			//$sql_obj->execute();
 
 			// table options
-			$sql_obj->string	= "INSERT INTO users_options (userid, name, value) VALUES ($id, 'shrink_tableoptions', '". $data["option_shrink_tableoptions"] ."')";
-			$sql_obj->execute();
+			//$sql_obj->string	= "INSERT INTO users_options (userid, name, value) VALUES ($id, 'shrink_tableoptions', '". $data["option_shrink_tableoptions"] ."')";
+			//$sql_obj->execute();
 
 			// debugging
 			$sql_obj->string	= "INSERT INTO users_options (userid, name, value) VALUES ($id, 'debug', '". $data["option_debug"] ."')";
 			$sql_obj->execute();
 
 			// concurrent logins
-			$sql_obj->string	= "INSERT INTO users_options (userid, name, value) VALUES ($id, 'concurrent_logins', '". $data["option_concurrent_logins"] ."')";
-			$sql_obj->execute();
+			//$sql_obj->string	= "INSERT INTO users_options (userid, name, value) VALUES ($id, 'concurrent_logins', '". $data["option_concurrent_logins"] ."')";
+			//$sql_obj->execute();
 
 
 

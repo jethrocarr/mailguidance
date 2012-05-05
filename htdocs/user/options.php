@@ -179,7 +179,7 @@ class page_output
 		
 		$this->obj_form->subforms["user_options"][]	= "option_timezone";
 */
-
+/*
 		// table options form shrink configuration
 		$structure = NULL;
 		$structure["fieldname"]		= "option_shrink_tableoptions";
@@ -189,7 +189,7 @@ class page_output
 		$this->obj_form->add_input($structure);
 
 		$this->obj_form->subforms["user_options"][]	= "option_shrink_tableoptions";
-
+*/
 
 		// administrator-only option
 		if (user_permissions_get("admin"))
@@ -202,6 +202,9 @@ class page_output
 			$structure["options"]["label"]	= "Enable debug logging - this will impact performance a bit but will show a full trail of all functions and SQL queries made <i>(note: this option is only avaliable to administrators)</i>";
 			$this->obj_form->add_input($structure);
 
+			$this->obj_form->subforms["user_options"][]	= "option_debug";
+
+/*
 			// concurrent logins
 			$structure = NULL;
 			$structure["fieldname"]		= "option_concurrent_logins";
@@ -210,8 +213,8 @@ class page_output
 			$structure["options"]["label"]	= "Permit this user to make multiple simultaneous logins</i>";
 			$this->obj_form->add_input($structure);
 			
-			$this->obj_form->subforms["user_options"][]	= "option_debug";
 			$this->obj_form->subforms["user_options"][]	= "option_concurrent_logins";
+*/
 		}
 
 
