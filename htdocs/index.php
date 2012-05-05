@@ -1,10 +1,9 @@
 <?php
 /*
 	MailGuidance
+	http://projects.jethrocarr.com/p/oss-mailguidance
 
-	(c) Copyright 2009 Amberdms Ltd
-
-	www.amberdms.com/mailguidance
+	(c) Copyright 2012 Jethro Carr
 
 	This program is free software: you can redistribute it and/or modify
 	it under the terms of the GNU Affero General Public License version 3
@@ -17,7 +16,6 @@
 
 	You should have received a copy of the GNU Affero General Public License
 	along with this program.  If not, see <http://www.gnu.org/licenses/>.
-
 */
 
 
@@ -81,7 +79,7 @@ else
 <html>
 <head>
 	<title>MailGuidance</title>
-	<meta name="copyright" content="(C)Copyright 2009 Amberdms Ltd">
+	<meta name="copyright" content="(C)Copyright 2012 Jethro Carr">
 
 
 <script type="text/javascript">

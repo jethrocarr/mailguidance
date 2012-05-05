@@ -1,6 +1,6 @@
 Summary: MailGuidance Filter Control Application
 Name: mailguidance
-Version: 1.0.0
+Version: 1.0
 Release: 1.%{?dist}
 License: AGPLv3
 URL: http://www.amberdms.com/mailguidance
@@ -85,6 +85,8 @@ rm -rf $RPM_BUILD_ROOT
 %{_datadir}/mailguidance
 
 %changelog
-* Tue Dec 01 2009 Jethro Carr <jethro.carr@amberdms.com> 1.0.0
+* Sun May 06 2012 Jethro Carr <jethro.carr@jethrocarr.com> 1.0
+- Packaged Public Release
+* Tue Dec 01 2009 Jethro Carr <jethro.carr@amberdms.com> 1.0.beta.2
 - Inital Application release
 
