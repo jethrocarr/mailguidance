@@ -13,10 +13,10 @@
 
 // define the application details
 $GLOBALS["config"]["app_name"]			= "MailGuidance";
-$GLOBALS["config"]["app_version"]		= "1.0";
+$GLOBALS["config"]["app_version"]		= "1.0.0";
 
 // define the schema version required
-$GLOBALS["config"]["schema_version"]		= "20120506";
+$GLOBALS["config"]["schema_version"]		= "20121118";
 
 
 

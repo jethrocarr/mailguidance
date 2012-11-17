@@ -1,9 +1,9 @@
 Summary: MailGuidance Filter Control Application
 Name: mailguidance
-Version: 1.0
+Version: 1.0.0
 Release: 1.%{?dist}
 License: AGPLv3
-URL: http://www.amberdms.com/mailguidance
+URL: http://projects.jethrocarr.com/p/oss-mailguidance/
 Group: Applications/Internet
 Source0: mailguidance-%{version}.tar.bz2
 
@@ -43,6 +43,9 @@ install -m755 htdocs/include/config.php $RPM_BUILD_ROOT%{_datadir}/mailguidance/
 # install the apache configuration file
 mkdir -p $RPM_BUILD_ROOT%{_sysconfdir}/httpd/conf.d
 install -m 644 resources/mailguidance-httpdconfig.conf $RPM_BUILD_ROOT%{_sysconfdir}/httpd/conf.d/mailguidance.conf
+
+# rename the user cron script
+mv $RPM_BUILD_ROOT%{_datadir}/mailguidance/scripts/mailguidance-cron-user.php.sample $RPM_BUILD_ROOT%{_datadir}/mailguidance/htdocs/scripts/mailguidance-cron-user.php
 
 
 %post
@@ -85,8 +88,8 @@ rm -rf $RPM_BUILD_ROOT
 %{_datadir}/mailguidance
 
 %changelog
-* Sun May 06 2012 Jethro Carr <jethro.carr@jethrocarr.com> 1.0
-- Packaged Public Release
+* Sun Nov 18 2012 Jethro Carr <jethro.carr@jethrocarr.com> 1.0.0
+- Packaged Public Release 1.0.0
 * Tue Dec 01 2009 Jethro Carr <jethro.carr@amberdms.com> 1.0.beta.2
 - Inital Application release
 
