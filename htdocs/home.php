@@ -39,7 +39,7 @@ else
 		function render_html()
 		{
 			print "<h3>OVERVIEW</h3>";
-			print "<p>Welcome to <a target=\"new\" href=\"http://www.amberdms.com/mailguidance\">MailGuidance</a>, an open source application for generating procmail filtering rulesets, ideal for use by teams of system administrators for easily defining who recives messages from particular servers or customers.</p>";
+			print "<p>Welcome to <a target=\"new\" href=\"http://projects.jethrocarr.com/p/oss-mailguidance\">MailGuidance</a>, an open source application for generating procmail filtering rulesets, ideal for use by teams of system administrators for easily defining who recives messages from particular servers or customers.</p>";
 
 
 			/*

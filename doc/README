@@ -1,8 +1,6 @@
 MAILGUIDANCE
 ============
 
-ABOUT
------
 MailGuidance is an AGPL web interface for generating procmail rulesets designed
 for organisations wanting to reliability distribute emails from automated
 systems to various staff.
@@ -23,22 +21,5 @@ gets forgotten about or dropped.
 
 If no rules match, the email gets distributed to all users so that it doesn't
 get ignored or missed by a catch all box.
-
-
-
-INSTALLATION
-------------
-
-
-
-EXECUTION
----------
-
-
-
-LICENSE
--------
-MailGuidance is licensed under the Affero General Public License (AGPL) as per the terms in doc/COPYING.
-
 
 
