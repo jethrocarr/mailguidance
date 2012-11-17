@@ -352,27 +352,15 @@ CREATE TABLE IF NOT EXISTS `users_sessions` (
 ) ENGINE=InnoDB  DEFAULT CHARSET=utf8 AUTO_INCREMENT=11 ;
 
 
-
-
-
---
--- Set Schema Version
---
-
-UPDATE `config` SET `value` = '20091026' WHERE name='SCHEMA_VERSION' LIMIT 1;
-
-
-
-
 --
 -- Database Installation Complete
 --
 
 
 
----
---- Upgrade 20120506
----
+--
+-- Upgrade 20120506
+--
 
 UPDATE `config` SET `value` = 'disabled' WHERE `config`.`name` = 'PHONE_HOME';
 
@@ -397,9 +385,9 @@ INSERT INTO `language` (`id`, `language`, `label`, `translation`) VALUES (NULL, 
 INSERT INTO `language` (`id`, `language`, `label`, `translation`) VALUES (NULL, 'en_us', 'user_delete', 'Delete User');
 
 
----
---- Upgrade 20121118
----
+--
+-- Upgrade 20121118
+--
 
 ALTER TABLE `users` CHANGE `ipaddress` `ipaddress` VARCHAR( 255 ) CHARACTER SET utf8 COLLATE utf8_general_ci NOT NULL ;
 ALTER TABLE `users_sessions` CHANGE `ipaddress` `ipaddress` VARCHAR( 255 ) CHARACTER SET utf8 COLLATE utf8_general_ci NOT NULL ;

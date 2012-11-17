@@ -1,7 +1,7 @@
 Summary: MailGuidance Filter Control Application
 Name: mailguidance
 Version: 1.0.0
-Release: 1.%{?dist}
+Release: 1%{?dist}
 License: AGPLv3
 URL: http://projects.jethrocarr.com/p/oss-mailguidance/
 Group: Applications/Internet
@@ -45,7 +45,7 @@ mkdir -p $RPM_BUILD_ROOT%{_sysconfdir}/httpd/conf.d
 install -m 644 resources/mailguidance-httpdconfig.conf $RPM_BUILD_ROOT%{_sysconfdir}/httpd/conf.d/mailguidance.conf
 
 # rename the user cron script
-mv $RPM_BUILD_ROOT%{_datadir}/mailguidance/scripts/mailguidance-cron-user.php.sample $RPM_BUILD_ROOT%{_datadir}/mailguidance/htdocs/scripts/mailguidance-cron-user.php
+mv $RPM_BUILD_ROOT%{_datadir}/mailguidance/scripts/mailguidance-cron-user.php.sample $RPM_BUILD_ROOT%{_datadir}/mailguidance/scripts/mailguidance-cron-user.php
 
 
 %post

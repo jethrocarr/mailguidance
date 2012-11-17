@@ -1,6 +1,6 @@
----
---- Upgrade 20120506
----
+--
+-- Upgrade 20120506
+--
 
 UPDATE `config` SET `value` = 'disabled' WHERE `config`.`name` = 'PHONE_HOME';
 
