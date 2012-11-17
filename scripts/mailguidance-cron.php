@@ -199,7 +199,7 @@ if ($_SESSION["user"]["debug"])
 */
 
 $obj_sql_filters		= New sql_query;
-$obj_sql_filters->string	= "SELECT filters.id as id, title, filter_types.type as type, value FROM filters LEFT JOIN filter_types ON filter_types.id = filters.type";
+$obj_sql_filters->string	= "SELECT filters.id as id, title, filter_types.type as type, value FROM filters LEFT JOIN filter_types ON filter_types.id = filters.type ORDER BY title";
 $obj_sql_filters->execute();
 
 

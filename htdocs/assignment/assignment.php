@@ -85,7 +85,10 @@ class page_output
 
 			$this->obj_table->columns[] = $data_users["id"];
 		}
+		
+		$this->obj_table->columns_order            = array("filter_title");
 
+		
 		// define SQL structure
 		$this->obj_table->sql_obj->prepare_sql_settable("filters");
 		$this->obj_table->sql_obj->prepare_sql_addfield("id", "filters.id");
