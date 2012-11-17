@@ -61,6 +61,25 @@ if (user_permissions_get("filters_write"))
 		error_flag_field("value");
 	}
 
+	// validate the filter type and behavior
+	switch (sql_get_singlevalue("SELECT type as value FROM filter_types WHERE id='". $obj_filter->data["type"] ."' LIMIT 1"))
+	{
+		case "sender_domain":
+		case "custom":
+		case "subject":
+			// run them all via FILTER_SANITIZE_EMAIL, it covers all the symbols and conditions we want to impost
+			// TODO: in future, narrow down each check exactly for more useful user feedback
+
+			$obj_filter->data["value"] = filter_var($obj_filter->data["value"], FILTER_SANITIZE_EMAIL);
+		break;
+
+		default:
+			log_write("error", "process", "The submitted filter type is unknown.");
+			error_flag_field("type");
+		break;
+	}
+
+
 
 	// return to input page if any errors occured
 	if (error_check())
