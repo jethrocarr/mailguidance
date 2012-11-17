@@ -49,6 +49,7 @@ class table
 	var $data_num_rows;			// number of rows
 
 	var $sql_obj;				// object used for SQL string, queries and data
+	var $obj_ldap;				// object used for LDAP queries
 	
 
 	var $render_columns;			// human readable column names
@@ -78,6 +79,7 @@ class table
 				timestamp_date	- UNIX style timestamp field (converts to date only)
 				money		- displays a financial value correctly
 				price		- legacy use - just calls money
+				precentage	- does formatting for display percentages
 				hourmins	- input is a number of seconds, display as H:MM
 				bool_tick	- interperate a bool as an image (1 == tick, 0 == cross)
 				
@@ -126,7 +128,7 @@ class table
 		$this->links[$name]["options"]	= $options_array;
 
 
-		if ($options_array["column"])
+		if (isset($options_array["column"]))
 		{
 			log_debug("table", "Configuring $name as a column link");
 
@@ -245,7 +247,7 @@ class table
 				{
 					// note: we only add the filter if a value has been saved to default value, otherwise
 					// we assume the SQL could break.
-					if ($this->filter[$fieldname]["defaultvalue"])
+					if (!empty($this->filter[$fieldname]["defaultvalue"]))
 					{
 						// It is possible to have filters with no SQL query
 						// supplied - these are used when creating complex filters which require code and can not
@@ -255,7 +257,7 @@ class table
 						// will handle it.
 						//
 
-						if ($this->filter[$fieldname]["sql"])
+						if (!empty($this->filter[$fieldname]["sql"]))
 						{
 							$query = str_replace("value", $this->filter[$fieldname]["defaultvalue"], $this->filter[$fieldname]["sql"]);
 							$this->sql_obj->prepare_sql_addwhere($query);
@@ -281,8 +283,6 @@ class table
 	}
 
 
-
-	
 
 	/*
 		load_data_sql()
@@ -344,6 +344,140 @@ class table
 
 
 	/*
+		init_data_ldap
+
+		Initalise the LDAP connection
+
+		Returns
+		0		Failure
+		1		Success
+	*/
+
+	function init_data_ldap()
+	{
+		log_write("debug", "inc_tables", "Executing init_data_ldap()");
+
+		$this->obj_ldap = New ldap_query;
+
+		return 1;
+	}
+
+	/*
+		load_data_ldap
+
+		Query from a LDAP database.
+
+		Values
+		filter
+		base_dn		(optional) DN to use or leave blank for default
+
+		Returns
+		0		Failure
+		1		Success
+	*/
+	function load_data_ldap($filter, $base_dn = NULL)
+	{
+		log_write("debug", "inc_tables", "Executing load_data_ldap($filter, $base_dn)");
+
+		$attributes = array();
+
+		// run through all the columns, and add their fields to the LDAP attribute query unless
+		// the dbname is equal to NONE, in which case ignore.
+		foreach ($this->columns as $column)
+		{
+			if ($this->structure[$column]["dbname"] != "NONE")
+			{
+				$attributes[] = $this->structure[$column]["dbname"];
+			}
+		}
+
+
+		// apply any LDAP filters that have been specified
+		if ($this->filter)
+		{
+			foreach (array_keys($this->filter) as $fieldname)
+			{
+				// ignore input from text fields, text fields
+				if ($this->filter[$fieldname]["type"] != "text")
+				{
+					// note: we only add the filter if a value has been saved to default value, otherwise
+					// we assume the filter could break.
+					if (!empty($this->filter[$fieldname]["defaultvalue"]))
+					{
+						// only apply ldap filters, ignore other types like SQL
+						if (!empty($this->filter[$fieldname]["ldap"]))
+						{
+							$filter = str_replace("value", $this->filter[$fieldname]["defaultvalue"], $this->filter[$fieldname]["ldap"]);
+						}
+					}
+				}
+			}
+		}
+
+
+
+		// connect to LDAP server
+		$this->obj_ldap->connect();
+
+
+		// set DN
+		if ($base_dn)
+		{
+			$this->obj_ldap->srvcfg["base_dn"] = $base_dn;
+		}
+
+
+		// run query and process results
+		if ($this->obj_ldap->search($filter, $attributes))
+		{
+			// run through returned records
+			$this->data_num_rows	= $this->obj_ldap->data_num_rows;
+
+			for ($i=0; $i < $this->data_num_rows; $i++)
+			{
+				$tmparray = array();
+
+				// fetch values for each column
+				foreach ($this->columns as $column)
+				{
+					if ($this->structure[$column]["dbname"] != "NONE")
+					{
+						if ($this->obj_ldap->data[$i][  $this->structure[$column]["dbname"]  ]["count"] > 1)
+						{
+							// convert array of values to comma-deliminated string
+							$values = array();
+
+							for ($j = 0; $j < $this->obj_ldap->data[$i][  $this->structure[$column]["dbname"]  ]["count"]; $j++)
+							{
+								$values[] = $this->obj_ldap->data[$i][  $this->structure[$column]["dbname"]  ][$j];
+							}
+
+							$tmparray[$column] = format_arraytocommastring( $values );
+						}
+						else
+						{
+							// single standard value
+							$tmparray[$column] = $this->obj_ldap->data[$i][  $this->structure[$column]["dbname"]  ][0];
+						}
+					}
+				}
+
+				// save data to final results
+				$this->data[]	= $tmparray;
+			}
+		}
+		else
+		{
+			// query failure or no rows returned
+			$this->data_num_rows	= 0;
+
+			return 0;
+		}
+	}
+	
+
+
+	/*
 		load_options_form()
 
 		Imports data from POST or SESSION which matches this form to be used for the options.
@@ -357,7 +491,7 @@ class table
 
 		*/
 
-		if ($_GET["reset"] == "yes")
+		if (isset($_GET["reset"]))
 		{
 			// reset the option form
 			$_SESSION["form"][$this->tablename] = NULL;
@@ -365,7 +499,7 @@ class table
 		else
 		{
 			
-			if ($_GET["table_display_options"])
+			if (isset($_GET["table_display_options"]))
 			{
 				// flag custom options as active - this is used to adjust the display of
 				// the table options dropdown
@@ -379,11 +513,14 @@ class table
 				// load checkboxes
 				foreach (array_keys($this->structure) as $column)
 				{
-					$column_setting = security_script_input("/^[a-z]*$/", $_GET[$column]);
-					
-					if ($column_setting == "on")
+					if (isset($_GET[$column]))
 					{
-						$this->columns[] = $column;
+						$column_setting = @security_script_input("/^[a-z]*$/", $_GET[$column]);
+					
+						if ($column_setting == "on")
+						{
+							$this->columns[] = $column;
+						}
 					}
 				}
 
@@ -391,9 +528,9 @@ class table
 				$num_cols = count(array_keys($this->structure));
 				for ($i=0; $i < $num_cols; $i++)
 				{
-					if ($_GET["order_$i"])
+					if (!empty($_GET["order_$i"]))
 					{
-						$this->columns_order[] = security_script_input("/^\S*$/", $_GET["order_$i"]);
+						$this->columns_order[] = @security_script_input("/^\S*$/", $_GET["order_$i"]);
 					}
 				}
 
@@ -406,14 +543,23 @@ class table
 					switch ($this->filter[$fieldname]["type"])
 					{
 						case "date":
-							$this->filter[$fieldname]["defaultvalue"] = security_script_input("/^[0-9]*-[0-9]*-[0-9]*$/", $_GET[$fieldname ."_yyyy"] ."-". $_GET[$fieldname ."_mm"] ."-". $_GET[$fieldname ."_dd"]);
+							$this->filter[$fieldname]["defaultvalue"] = @@security_script_input("/^[0-9]*-[0-9]*-[0-9]*$/", $_GET[$fieldname ."_yyyy"] ."-". $_GET[$fieldname ."_mm"] ."-". $_GET[$fieldname ."_dd"]);
 
 							if ($this->filter[$fieldname]["defaultvalue"] == "--")
 								$this->filter[$fieldname]["defaultvalue"] = "";
 						break;
 
+						case "timestamp":
+							$this->filter[$fieldname]["defaultvalue"] = security_script_input("/^[0-9]*$/", $_GET[$fieldname]);
+
+							if ($this->filter[$fieldname]["defaultvalue"] == "--")
+								$this->filter[$fieldname]["defaultvalue"] = "";
+						break;
+
+
+
 						default:
-							$this->filter[$fieldname]["defaultvalue"] = security_script_input("/^\S*$/", $_GET[$fieldname]);
+							$this->filter[$fieldname]["defaultvalue"] = @@security_script_input("/^\S*$/", $_GET[$fieldname]);
 						break;
 					}
 
@@ -423,7 +569,7 @@ class table
 				}
 
 			}
-			elseif ($_SESSION["form"][$this->tablename]["columns"])
+			elseif (isset($_SESSION["form"][$this->tablename]["columns"]))
 			{
 				log_debug("table", "Loading options form from session data");
 				
@@ -436,7 +582,10 @@ class table
 				// load filterby options
 				foreach (array_keys($this->filter) as $fieldname)
 				{
-					$this->filter[$fieldname]["defaultvalue"] = $_SESSION["form"][$this->tablename]["filters"][$fieldname];
+					if (isset($_SESSION["form"][$this->tablename]["filters"][$fieldname]))
+					{
+						$this->filter[$fieldname]["defaultvalue"] = $_SESSION["form"][$this->tablename]["filters"][$fieldname];
+					}
 				}
 			}
 
@@ -446,7 +595,10 @@ class table
 			
 			foreach (array_keys($this->filter) as $fieldname)
 			{
-				$_SESSION["form"][$this->tablename]["filters"][$fieldname] = $this->filter[$fieldname]["defaultvalue"];
+				if (isset($this->filter[$fieldname]["defaultvalue"]))
+				{
+					$_SESSION["form"][$this->tablename]["filters"][$fieldname] = $this->filter[$fieldname]["defaultvalue"];
+				}
 			}
 		}
 
@@ -465,7 +617,7 @@ class table
 	{
 		foreach ($this->columns as $column)
 		{
-			if ($this->structure[$column]["custom"]["label"])
+			if (isset($this->structure[$column]["custom"]["label"]))
 			{
 				$this->render_columns[$column] = $this->structure[$column]["custom"]["label"];
 			}
@@ -493,6 +645,12 @@ class table
 			See the add_column function for comments about
 			the different possible types.
 		*/
+		if (!isset($this->structure[$column]["type"]))
+		{
+			$this->structure[$column]["type"] = "";
+		}
+
+
 		switch ($this->structure[$column]["type"])
 		{
 			case "date":
@@ -556,7 +714,7 @@ class table
 					$total = "yes";
 				
 				
-				if ($this->data[$row][$column] == 0 && !$total)
+				if (empty($this->data[$row][$column]) && !$total)
 				{
 					// instead of 0.00, make blank, as long as this field is not a total
 					$result = "";
@@ -569,7 +727,7 @@ class table
 
 			case "hourmins":
 				// value is a number of seconds, we need to convert into an H:MM format.
-				$result = time_format_hourmins($this->data[$row][$column]);
+				$result = @time_format_hourmins($this->data[$row][$column]);
 			break;
 
 
@@ -577,7 +735,7 @@ class table
 				// label as Y or N. The render functions may perform further work such
 				// as displaying icons instead
 
-				if ($this->data[$row][$column])
+				if (!empty($this->data[$row][$column]))
 				{
 					$result = "Y";
 				}
@@ -591,9 +749,27 @@ class table
 				$result = format_text_display($this->data[$row][$column]);
 			break;
 
+			case "percentage":
+				if (!empty($this->data[$row][$column]))
+				{
+					$result = $this->data[$row][$column] ."%";
+				}
+				else
+				{
+					$result = "";
+				}
+			break;
+
 			case "standard":
 			default:
-				$result = $this->data[$row][$column];
+				if (isset($this->data[$row][$column]))
+				{
+					$result = $this->data[$row][$column];
+				}
+				else
+				{
+					$result = "";
+				}
 			break;
 			
 		} // end of switch
@@ -617,17 +793,17 @@ class table
 
 		// if the user has not configured any default options, display the dropdown
 		// link bar instead of the main options table.
-		if (!$_SESSION["form"][$this->tablename]["custom_options_active"])
+		if (!isset($_SESSION["form"][$this->tablename]["custom_options_active"]))
 		{
 			if ($_SESSION["user"]["shrink_tableoptions"] == "on")
 			{
 				print "<div id=\"". $this->tablename ."_link\">";
 
-				print "<table width=\"100%\" class=\"table_options_dropdown\">";
-				print "<tr bgcolor=\"#666666\">";
+				print "<table class=\"table_options_dropdown\">";
+				print "<tr>";
 
-					print "<td width=\"100%\" onclick=\"obj_show('". $this->tablename ."_form'); obj_hide('". $this->tablename ."_link');\">";
-					print "<b style=\"color: #ffffff; text-decoration: none\">ADJUST TABLE OPTIONS &gt;&gt;</b>";
+					print "<td onclick=\"obj_show('". $this->tablename ."_form'); obj_hide('". $this->tablename ."_link');\">";
+					print "ADJUST TABLE OPTIONS &gt;&gt;";
 					print "</td>";
 
 				print "</tr>";
@@ -640,7 +816,7 @@ class table
 
 		// border table / div object
 		print "<div id=\"". $this->tablename ."_form\">";
-		print "<table width=\"100%\" style=\"border: 1px solid #666666;\" bgcolor=\"#e7e7e7\"><tr><td>";
+		print "<table class=\"table_options\"><tr><td>";
 
 
 		
@@ -704,7 +880,7 @@ class table
 			$structure["fieldname"]		= $column;
 			$structure["type"]		= "checkbox";
 
-			if ($this->structure[$column]["custom"]["label"])
+			if (isset($this->structure[$column]["custom"]["label"]))
 			{
 				$structure["options"]["label"]	= lang_trans($this->structure[$column]["custom"]["label"]);
 			}
@@ -731,7 +907,7 @@ class table
 		print "<table width=\"100%\"><tr>";
 	
 	
-		print "<td width=\"50%\" valign=\"top\"  style=\"padding: 4px; background-color: #e7e7e7;\">";
+		print "<td width=\"50%\" valign=\"top\"  style=\"padding: 4px;\">";
 			print "<b>Fields to display:</b><br><br>";
 
 			print "<table width=\"100%\">";
@@ -763,7 +939,7 @@ class table
 		*/
 		
 		
-		print "<td width=\"50%\" valign=\"top\" style=\"padding: 4px; background-color: #e7e7e7;\">";
+		print "<td width=\"50%\" valign=\"top\" style=\"padding: 4px;\">";
 			print "<b>Filter/Search Options:</b><br><br>";
 
 			print "<table width=\"100%\">";
@@ -792,7 +968,7 @@ class table
 		/* Order By Options */
 		if ($this->columns_order_options)
 		{
-			print "<td width=\"100%\" colspan=\"4\" valign=\"top\" style=\"padding: 4px; background-color: #e7e7e7;\">";
+			print "<td width=\"100%\" colspan=\"4\" valign=\"top\" style=\"padding: 4px;\">";
 
 				print "<br><b>Order By:</b><br>";
 
@@ -811,8 +987,10 @@ class table
 					$structure["type"]		= "dropdown";
 					$structure["options"]["width"]	= 150;
 					
-					if ($this->columns_order[$i])
+					if (isset($this->columns_order[$i]))
+					{
 						$structure["defaultvalue"] = $this->columns_order[$i];
+					}
 
 					$structure["values"] = $this->columns_order_options;
 
@@ -835,7 +1013,7 @@ class table
 			Submit Row
 		*/
 		print "<tr>";
-		print "<td colspan=\"4\" valign=\"top\" style=\"padding: 4px; background-color: #e7e7e7;\">";
+		print "<td colspan=\"4\" valign=\"top\" style=\"padding: 4px;\">";
 	
 			print "<table>";
 			print "<tr><td>";
@@ -928,7 +1106,7 @@ class table
 		print "</div>";
 
 		// auto-hide options at startup
-		if (!$_SESSION["form"][$this->tablename]["custom_options_active"])
+		if (!isset($_SESSION["form"][$this->tablename]["custom_options_active"]))
 		{
 			if ($_SESSION["user"]["shrink_tableoptions"] == "on")
 			{
@@ -956,7 +1134,8 @@ class table
 		// translate the column labels
 		$this->render_column_names();
 
-
+		$total_rows_incrementing = 0;
+		
 		// format data rows
 		for ($i=0; $i < $this->data_num_rows; $i++)
 		{
@@ -987,7 +1166,10 @@ class table
 						foreach ($this->total_rows as $total_col)
 						{
 							// add to the total
-							$this->data[$i]["total"] += $this->data[$i][$total_col];
+							if (isset($this->data[$i][$total_col]))
+							{
+								$this->data[$i]["total"] += $this->data[$i][$total_col];
+							}
 						}
 					break;
 
@@ -1084,7 +1266,10 @@ class table
 					
 					for ($i=0; $i < $this->data_num_rows; $i++)
 					{
-						$this->data["total"][$column] += $this->data[$i][$column];
+						if (isset($this->data[$i][$column]))
+						{
+							$this->data["total"][$column] += $this->data[$i][$column];
+						}
 					}
 
 					$this->data_render["total"][$column] = $this->render_field($column, "total");
@@ -1138,7 +1323,7 @@ class table
 		{
 			// add a custom link if one has been specified, otherwise
 			// just display the standard name
-			if ($this->structure[$column]["custom"]["link"])
+			if (isset($this->structure[$column]["custom"]["link"]))
 			{
 				print "\t<td class=\"header\"><b><a class=\"header_link\" href=\"". $this->structure[$column]["custom"]["link"] ."\">". $this->render_columns[$column] ."</a></b></td>\n";
 			}
@@ -1162,7 +1347,7 @@ class table
 		// display data
 		for ($i=0; $i < $this->data_num_rows; $i++)
 		{
-			if ($this->data[$i]["options"]["css_class"])
+			if (isset($this->data[$i]["options"]["css_class"]))
 			{
 				print "<tr class=\"". $this->data[$i]["options"]["css_class"] ."\">\n";
 			}
@@ -1180,46 +1365,107 @@ class table
 				print "\t<td valign=\"top\">";
 
 				// hyperlink?
-				if ($this->links_columns[ $columns ])
+				if (isset($this->links_columns[ $columns ]))
 				{
 					$link		= $this->links_columns[ $columns ];
 					$linkname	= language_translate_string($this->language, $link);
+					$link_valid	= 1;
 
-					// link to page
-					// There are two ways:
-					// 1. (default) Link to index.php
-					// 2. Set the ["options]["full_link"] value to yes to force a full link
+					
+					/*
+						check if there are any logic options we need to process
 
-					if ($this->links[$link]["options"]["full_link"] == "yes")
-					{
-						print "<a href=\"". $this->links[$link]["page"] ."?libfiller=n";
-					}
-					else
-					{
-						print "<a href=\"index.php?page=". $this->links[$link]["page"] ."";
-					}
+						This is used to provide the capabilities such as optional hyperlinks that
+						only appear for same table rows.
+					*/
 
-					// add each option
-					foreach (array_keys($this->links[$link]["options"]) as $getfield)
+					// if statements
+					if (!empty($this->links[$link]["options"]["logic"]["if"]))
 					{
-						/*
-							There are two methods for setting the value of the variable:
-							1. The value has been passed.
-							2. The name of a column to take the value from has been passed
-						*/
-						if ($this->links[$link]["options"][$getfield]["value"])
+						foreach (array_keys($this->links[$link]["options"]["logic"]["if"]) as $logic)
 						{
-							print "&$getfield=". $this->links[$link]["options"][$getfield]["value"];
+							if ($this->links[$link]["options"]["logic"]["if"]["column"])
+							{
+								if ($this->data[$i][  $this->links[$link]["options"]["logic"]["if"]["column"] ])
+								{
+									$link_valid = 1;
+								}
+								else
+								{
+									// ensures that multiple if queries act as AND rather than OR
+									$link_valid = 0;
+								}
+							}
+						}
+					}
+
+					// if not statements
+					if (!empty($this->links[$link]["options"]["logic"]["if_not"]))
+					{
+						foreach (array_keys($this->links[$link]["options"]["logic"]["if_not"]) as $logic)
+						{
+							if ($this->links[$link]["options"]["logic"]["if_not"]["column"])
+							{
+								if (!$this->data[$i][  $this->links[$link]["options"]["logic"]["if_not"]["column"] ])
+								{
+									$link_valid = 1;
+								}
+								else
+								{
+									// ensures that multiple if queries act as AND rather than OR
+									$link_valid = 0;
+								}
+							}
+						}
+					}
+
+
+
+
+					/*
+						If the link passed logic processing, display
+					*/
+
+					if ($link_valid)
+					{
+						// link to page
+						// There are two ways:
+						// 1. (default) Link to index.php
+						// 2. Set the ["options]["full_link"] value to yes to force a full link
+
+						if (isset($this->links[$link]["options"]["full_link"]) && $this->links[$link]["options"]["full_link"] == "yes")
+						{
+							print "<a href=\"". $this->links[$link]["page"] ."?libfiller=n";
 						}
 						else
 						{
-							print "&$getfield=". $this->data[$i][ $this->links[$link]["options"][$getfield]["column"] ];
+							print "<a href=\"index.php?page=". $this->links[$link]["page"] ."";
 						}
-					}
 
-					// finish link
-					print "\">";
-				}
+						// add each option
+						foreach (array_keys($this->links[$link]["options"]) as $getfield)
+						{
+							/*
+								There are two methods for setting the value of the variable:
+								1. The value has been passed.
+								2. The name of a column to take the value from has been passed
+							*/
+							if ($this->links[$link]["options"][$getfield]["value"])
+							{
+								print "&$getfield=". $this->links[$link]["options"][$getfield]["value"];
+							}
+							else
+							{
+								print "&$getfield=". $this->data[$i][ $this->links[$link]["options"][$getfield]["column"] ];
+							}
+						}
+
+						// finish link
+						print "\">";
+
+					} // end if link valid
+
+				} // end if hyperlink
 
 				// handle bool images
 				if ($this->structure[$columns]["type"] == "bool_tick")
@@ -1249,7 +1495,7 @@ class table
 
 
 				// end hyperlink
-				if ($this->links["columns"][ $columns ])
+				if (isset($this->links["columns"][ $columns ]) && $link_valid)
 				{
 					print "</a>";
 				}
@@ -1259,14 +1505,14 @@ class table
 
 
 			// optional: row totals column
-			if ($this->total_rows)
+			if (isset($this->total_rows))
 			{
 				print "\t<td><b>". $this->data_render[$i]["total"] ."</b></td>\n";
 			}
 
 			
 			// optional: links column
-			if ($this->links)
+			if (isset($this->links))
 			{
 				// filter out column links from the links page
 				$links			= array_keys($this->links);
@@ -1276,7 +1522,7 @@ class table
 
 				foreach ($links as $link)
 				{
-					if (!$this->links[$link]["options"]["column"])
+					if (!isset($this->links[$link]["options"]["column"]))
 					{
 						$links_count++;
 						$links_available[] = $link;
@@ -1291,42 +1537,102 @@ class table
 					{
 						$count++;
 						
-						$linkname = language_translate_string($this->language, $link);
+						$linkname	= language_translate_string($this->language, $link);
+						$link_valid	= 1;
 
-						// link to page
-						// There are two ways:
-						// 1. (default) Link to index.php
-						// 2. Set the ["options]["full_link"] value to yes to force a full link
+						
+						/*
+							check if there are any logic options we need to process
 
-						if ($this->links[$link]["options"]["full_link"] == "yes")
-						{
-							print "<a class=\"button_small\" href=\"". $this->links[$link]["page"] ."?libfiller=n";
-						}
-						else
-						{
-							print "<a class=\"button_small\" href=\"index.php?page=". $this->links[$link]["page"] ."";
-						}
+							This is used to provide the capabilities such as optional hyperlinks that
+							only appear for same table rows.
+						*/
 
-						// add each option
-						foreach (array_keys($this->links[$link]["options"]) as $getfield)
+						// if statements
+						if (isset($this->links[$link]["options"]["logic"]["if"]) && ($this->links[$link]["options"]["logic"]["if"] != NULL))
 						{
-							/*
-								There are two methods for setting the value of the variable:
-								1. The value has been passed.
-								2. The name of a column to take the value from has been passed
-							*/
-							if ($this->links[$link]["options"][$getfield]["value"])
+							foreach (array_keys($this->links[$link]["options"]["logic"]["if"]) as $logic)
 							{
-								print "&$getfield=". $this->links[$link]["options"][$getfield]["value"];
+								if ($this->links[$link]["options"]["logic"]["if"]["column"])
+								{
+									if ($this->data[$i][  $this->links[$link]["options"]["logic"]["if"]["column"] ])
+									{
+										$link_valid = 1;
+									}
+									else
+									{
+										// ensures that multiple if queries act as AND rather than OR
+										$link_valid = 0;
+									}
+								}
+							}
+						}
+
+						// if not statements
+						if (isset($this->links[$link]["options"]["logic"]["if_not"]) && ($this->links[$link]["options"]["logic"]["if_not"] != NULL))
+						{
+							foreach (array_keys($this->links[$link]["options"]["logic"]["if_not"]) as $logic)
+							{
+								if ($this->links[$link]["options"]["logic"]["if_not"]["column"])
+								{
+									if (!$this->data[$i][  $this->links[$link]["options"]["logic"]["if_not"]["column"] ])
+									{
+										$link_valid = 1;
+									}
+									else
+									{
+										// ensures that multiple if queries act as AND rather than OR
+										$link_valid = 0;
+									}
+								}
+							}
+						}
+
+
+
+
+						/*
+							If the link passed logic processing, display
+						*/
+
+						if ($link_valid)
+						{
+							// link to page
+							// There are two ways:
+							// 1. (default) Link to index.php
+							// 2. Set the ["options]["full_link"] value to yes to force a full link
+
+							if (isset($this->links[$link]["options"]["full_link"]) && $this->links[$link]["options"]["full_link"] == "yes")
+							{
+								print "<a class=\"button_small\" href=\"". $this->links[$link]["page"] ."?libfiller=n";
 							}
 							else
 							{
-								print "&$getfield=". $this->data[$i][ $this->links[$link]["options"][$getfield]["column"] ];
+								print "<a class=\"button_small\" href=\"index.php?page=". $this->links[$link]["page"] ."";
 							}
-						}
 
-						// finish link
-						print "\">$linkname</a>";
+							// add each option
+							foreach (array_keys($this->links[$link]["options"]) as $getfield)
+							{
+								/*
+									There are two methods for setting the value of the variable:
+									1. The value has been passed.
+									2. The name of a column to take the value from has been passed
+								*/
+								if (isset($this->links[$link]["options"][$getfield]["value"]))
+								{
+									print "&$getfield=". $this->links[$link]["options"][$getfield]["value"];
+								}
+								else
+								{
+									print "&$getfield=". $this->data[$i][ $this->links[$link]["options"][$getfield]["column"] ];
+								}
+							}
+
+							// finish link
+							print "\">$linkname</a>";
+
+						} // end if link valid
 
 						// if required, add seporator
 						if ($count < $links_count)
@@ -1345,7 +1651,7 @@ class table
 
 
 		// display totals for columns
-		if ($this->total_columns)
+		if (isset($this->total_columns))
 		{
 			print "<tr>\n";
 
@@ -1366,14 +1672,14 @@ class table
 			}
 
 			// optional: totals for rows
-			if ($this->total_rows)
+			if (isset($this->total_rows))
 			{
-				print "\t<td class=\"footer\"><b>". $this->data_render["total"]["total"] ."</b></td>\n";
+				print "\t<td class=\"footer\"><b>". @$this->data_render["total"]["total"] ."</b></td>\n";
 			}
 
 
 			// optional: filler for link column
-			if ($this->links)
+			if (isset($this->links))
 				print "\t<td class=\"footer\">&nbsp;</td>\n";
 			
 			print "</tr>\n";
@@ -1420,14 +1726,14 @@ class table
 			// content for columns
 			foreach ($this->columns as $columns)
 			{
-				print "\"". $this->data_render[$i][$columns] ."\",";
+				print "\"". str_replace('"', '""',$this->data_render[$i][$columns]) ."\",";
 			}
 
 
 			// optional: row totals column
 			if ($this->total_rows)
 			{
-				print "\"". $this->data_render[$i]["total"] ."\",";
+				print "\"". str_replace('"', '""',$this->data_render[$i]["total"]) ."\",";
 			}
 	
 		}
@@ -1443,7 +1749,7 @@ class table
 				
 				if (in_array($column, $this->total_columns))
 				{
-					print $this->data_render["total"][$column];
+					print str_replace('"', '""',$this->data_render["total"][$column]);
 				}
 
 				print "\",";
@@ -1452,7 +1758,7 @@ class table
 			// optional: totals for rows
 			if ($this->total_rows)
 			{
-				print "\"". $this->data_render["total"]["total"] ."\",";
+				print "\"". str_replace('"', '""',$this->data_render["total"]["total"]) ."\",";
 			}
 
 			print "\n";
@@ -1558,14 +1864,14 @@ class table
 
 		
 		// table foreach loop
-		$output_tabledata[]		= '%% foreach table_data';
+		$output_tabledata[]		= '%% foreach table\_data';
 
 		$line	= "";
 		$line	.= '%% ';
 
 		for ($i=0; $i < $col_num; $i++)
 		{
-			$line .= '(column_'. $i .')';
+			$line .= '(column\_'. $i .')';
 
 			if ($i != ($col_num - 1))
 			{
@@ -1575,7 +1881,7 @@ class table
 
 		if ($this->total_rows)
 		{
-			$line .= ' & (column_total) ';
+			$line .= ' & (column\_total) ';
 		}
 
 		$line .= '\tabularnewline';
@@ -1656,12 +1962,8 @@ class table
 		// company logo
 		$template_pdf->prepare_add_file("company_logo", "png", "COMPANY_LOGO", 0);
 
-		// options
-		$template_pdf->prepare_add_field("", time_format_humandate($this->date_start));
-
-
 		// table name
-		$template_pdf->prepare_add_field("table\_name", language_translate_string($this->language, $this->tablename));
+		$template_pdf->prepare_add_field("table_name", language_translate_string($this->language, $this->tablename));
 
 
 		// table options
@@ -1679,27 +1981,32 @@ class table
 
 			$structure["option_name"] = language_translate_string($this->language, $filtername);
 
-			if ($this->filter[$filtername]["type"] == "date")
+			switch ($this->filter[$filtername]["type"])
 			{
-				$structure["option_value"] = time_format_humandate($this->filter[$filtername]["defaultvalue"]);
-			}
-			else
-			{
-				if ($this->filter[$filtername]["defaultvalue"])
-				{
-					$structure["option_value"] = $this->filter[$filtername]["defaultvalue"];
-				}
-				else
-				{
-					$structure["option_value"] = "---";
-				}
+				case "date":
+					$structure["option_value"] = time_format_humandate($this->filter[$filtername]["defaultvalue"]);
+				break;
+
+				case "timestamp":
+					$structure["option_value"] = time_format_humandate($this->filter[$filtername]["defaultvalue"]);
+				break;
+
+				default:
+					// for all other types of filters, just display raw
+					if ($this->filter[$filtername]["defaultvalue"])
+					{
+						$structure["option_value"] = $this->filter[$filtername]["defaultvalue"];
+					}
+					else
+					{
+						$structure["option_value"] = "---";
+					}
+				break;
 			}
 
 
 			$structure_main[] = $structure;
 		}
-
-
 
 		$template_pdf->prepare_add_array("table_options", $structure_main);
 
@@ -1740,22 +2047,23 @@ class table
 
 				if (in_array($column, $this->total_columns))
 				{
-					$template_pdf->prepare_add_field('column\_total\_'. $j, $this->data_render["total"][ $column ]);
+					$template_pdf->prepare_add_field('column_total_'. $j, $this->data_render["total"][ $column ]);
 				}
 				else
 				{
-					$template_pdf->prepare_add_field('column\_total\_'. $j, "");
+					$template_pdf->prepare_add_field('column_total_'. $j, "");
 				}
 			}
 
 			// optional: totals for rows
 			if ($this->total_rows)
 			{
-				$template_pdf->prepare_add_field('column\_total\_total', $this->data_render["total"]["total"]);
+				$template_pdf->prepare_add_field('column_total_total', $this->data_render["total"]["total"]);
 			}
 
 			print "\n";
 		}
+
 
 
 		/*
@@ -1773,6 +2081,7 @@ class table
 
 		// display PDF
 		print $template_pdf->output;
+//		print_r($template_pdf->template);
 //		print_r($template_pdf->processed);
 //		print_r($template_pdf->data_array);
 

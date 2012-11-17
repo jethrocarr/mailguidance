@@ -37,8 +37,8 @@ function log_debug($category, $content)
 }
 
 function log_write($type, $category, $content)
-{
-	if ($_SESSION["user"]["debug"] == "on")
+{	
+	if (!empty($_SESSION["user"]["debug"]))
 	{
 		// write log record
 		$log_record = array();
@@ -57,8 +57,13 @@ function log_write($type, $category, $content)
 		$_SESSION["user"]["log_debug"][] = $log_record;
 		
 		// print log messages when running from CLI
-		if ($_SESSION["mode"] == "cli")
-			print "Debug: $content\n";
+		if (!empty($_SESSION["mode"]))
+		{
+			if ($_SESSION["mode"] == "cli")
+			{
+				print "Debug: $content\n";
+			}
+		}
 	}
 
 	// also add error messages to the error array
@@ -67,7 +72,7 @@ function log_write($type, $category, $content)
 		$_SESSION["error"]["message"][] = $content;
 		
 		// print log messages when running from CLI
-		if ($_SESSION["mode"] == "cli")
+		if (isset($_SESSION["mode"]) && $_SESSION["mode"] == "cli")
 			print "Error: $content\n";
 	}
 
@@ -77,7 +82,7 @@ function log_write($type, $category, $content)
 		$_SESSION["notification"]["message"][] = $content;
 		
 		// print log messages when running from CLI
-		if ($_SESSION["mode"] == "cli")
+		if (isset($_SESSION["mode"]) && ($_SESSION["mode"] == "cli"))
 			print "$content\n";
 	}
 
@@ -90,10 +95,10 @@ function log_write($type, $category, $content)
 	INCLUDE MAJOR AMBERDPHPLIB COMPONENTS
 */
 
-log_debug("start", "");
-log_debug("start", "AMBERPHPLIB STARTED");
-log_debug("start", "Debugging for: ". $_SERVER["REQUEST_URI"] ."");
-log_debug("start", "");
+@log_debug("start", "");
+@log_debug("start", "AMBERPHPLIB STARTED");
+@log_debug("start", "Debugging for: ". $_SERVER["REQUEST_URI"] ."");
+@log_debug("start", "");
 
 
 // Important that we require language first, since other functions
@@ -102,6 +107,7 @@ require("inc_language.php");
 
 // DB SQL processing and execution
 require("inc_sql.php");
+require("inc_ldap.php");
 
 // User + Security Functions
 require("inc_user.php");
@@ -135,6 +141,48 @@ log_debug("start", "Framework Load Complete.");
 
 
 /*
+	Load Application Configuration
+
+	Some configuration is done locally (such as DB auth details), however most configuration is stored
+	inside the database to provide easier management, display and validation of configuration.
+*/
+
+log_debug("start", "Loading configuration from database");
+
+$sql_config_obj			= New sql_query;
+$sql_config_obj->string		= "SELECT name, value FROM config ORDER BY name";
+$sql_config_obj->execute();
+$sql_config_obj->fetch_array();
+
+foreach ($sql_config_obj->data as $data_config)
+{
+	$GLOBALS["config"][ $data_config["name"] ] = $data_config["value"];
+}
+
+unset($sql_config_obj);
+
+
+
+/*
+	Run Corrections
+
+	Legacy adjustments to work around limitations that should be fixed
+	in future but can't be done at once without potentially breaking applications
+*/
+
+
+// if user debugging is set to disabled, make NULL so reports as empty()
+if (isset($_SESSION["user"]["debug"]))
+{
+	if ($_SESSION["user"]["debug"] == "disabled")
+	{
+		$_SESSION["user"]["debug"] = NULL;
+	}
+}
+
+
+
+/*
 	Configure Local Timezone
 
 	Decent timezone handling was only implemented with PHP 5.2.0, so the ability to select the user's localtime zone
@@ -150,7 +198,7 @@ if (version_compare(PHP_VERSION, '5.2.0') === 1)
 	log_debug("start", "Setting timezone based on user/system configuration");
 	
 	// fetch config option
-	if ($_SESSION["user"]["timezone"])
+	if (isset($_SESSION["user"]["timezone"]))
 	{
 		// fetch from user preferences
 		$timezone = $_SESSION["user"]["timezone"];
@@ -163,8 +211,17 @@ if (version_compare(PHP_VERSION, '5.2.0') === 1)
 
 	// if set to SYSTEM just use the default of the server, otherwise
 	// we need to set the timezone here.
-	if ($timezone != "SYSTEM")
+	if ($timezone == "SYSTEM")
 	{
+		// set to the server default
+		log_debug("start", "Using server timezone default");
+		@date_default_timezone_set(@date_default_timezone_get());
+	}
+	else
+	{
+		// set to user selected or application default
+		log_debug("start", "Using application configured timezone");
+
 		if (!date_default_timezone_set($timezone))
 		{
 			log_write("error", "start", "A problem occured trying to set timezone to \"$timezone\"");
@@ -192,7 +249,7 @@ if (version_compare(PHP_VERSION, '5.2.0') === 1)
 
 // ensure a language has been set in the user's profile, otherwise select
 // a default from the main configuration database
-if (!$_SESSION["user"]["lang"])
+if (!isset($_SESSION["user"]["lang"]))
 {
 	$_SESSION["user"]["lang"] = sql_get_singlevalue("SELECT value FROM config WHERE name='LANGUAGE_DEFAULT' LIMIT 1");
 }

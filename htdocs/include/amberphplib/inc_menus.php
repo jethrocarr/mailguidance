@@ -60,16 +60,34 @@ class menu_main
 
 		if (user_online())
 		{
-			// fetch all permissions belonging to the user
-			$sql_obj 		= New sql_query;
-			$sql_obj->string	= "SELECT permid FROM `users_permissions` WHERE userid='". $_SESSION["user"]["id"] ."'";
+			// it's probably the first time we're checking for permissions
+			// we should pre-load them all if needed
+			if (!isset($GLOBALS["cache"]["user"]["perms"]))
+			{
+				$obj_user_auth = New user_auth;
+				$obj_user_auth->permissions_init();
+			}
 
+			// fetch ID of all permissions
+			$sql_obj 		= New sql_query;
+			$sql_obj->string	= "SELECT id, value FROM permissions";
 			$sql_obj->execute();
 			$sql_obj->fetch_array();
 				
-			foreach ($sql_obj->data as $data)
+
+			// build array of all permissions IDs for the groups the user belongs to.
+			foreach (array_keys($GLOBALS["cache"]["user"]["perms"]) as $type)
 			{
-				$user_permissions[] = $data["permid"];
+				if ($GLOBALS["cache"]["user"]["perms"][$type] == 1)
+				{
+					foreach ($sql_obj->data as $data_permids)
+					{
+						if ($data_permids["value"] == $type)
+						{
+							$user_permissions[] = $data_permids["id"];
+						}
+					}
+				}
 			}
 
 			// (legacy) For system without a public permissions group, add the ID of 0
@@ -236,35 +254,41 @@ class menu_main
 		log_debug("menu_main", "Executing render_menu_standard()");
 
 
-		print "<table width=\"100%\" cellspacing=\"0\" cellpadding=\"0\" border=\"0\">";
-
+		print "<table class=\"menu_table\">";
 
 		// run through the menu order
 		for ($i = 0; $i <= count($this->menu_order); $i++)
 		{
 			print "<tr>";
-			print "<td width=\"100%\" cellpadding=\"0\" cellborder=\"0\" cellspacing=\"0\">";
+			print "<td>";
 			print "<ul id=\"menu\">";
 
 
 			// loop though the menu data
 			foreach ($this->menu_structure as $data)
 			{
-				if ($data["parent"] == $this->menu_order[$i])
+				if (isset($this->menu_order[$i]))
 				{
-					// if this entry has no topic, it only exists for the purpose of getting a parent
-					// link highlighted. In this case, ignore the current entry.
-
-					if ($data["topic"])
+					if ($data["parent"] == $this->menu_order[$i])
 					{
-						// highlight the entry, if it's the parent of the next sub menu, or if this is a sub menu.
-						if ($this->menu_order[$i + 1] == $data["topic"] || $data["link"] == $this->page)
+						// if this entry has no topic, it only exists for the purpose of getting a parent
+						// link highlighted. In this case, ignore the current entry.
+
+						if ($data["topic"])
 						{
-							print "<li><a style=\"background-color: #7e7e7e;\" href=\"index.php?page=". $data["link"] ."\" title=". lang_trans($data["topic"]) .">". lang_trans($data["topic"]) ."</a></li>";
-						}
-						else
-						{
-							print "<li><a href=\"index.php?page=". $data["link"] ."\" title=". lang_trans($data["topic"]) .">". lang_trans($data["topic"]) ."</a></li>";
+							// highlight the entry, if it's the parent of the next sub menu, or if this is a sub menu.
+							if (isset($this->menu_order[$i + 1]) && $this->menu_order[$i + 1] == $data["topic"])
+							{
+								print "<li><a class=\"menu_current\" href=\"index.php?page=". $data["link"] ."\" title=". lang_trans($data["topic"]) .">". lang_trans($data["topic"]) ."</a></li>";
+							}
+							elseif ($data["link"] == $this->page)
+							{
+								print "<li><a class=\"menu_current\" href=\"index.php?page=". $data["link"] ."\" title=". lang_trans($data["topic"]) .">". lang_trans($data["topic"]) ."</a></li>";
+							}
+							else
+							{
+								print "<li><a href=\"index.php?page=". $data["link"] ."\" title=". lang_trans($data["topic"]) .">". lang_trans($data["topic"]) ."</a></li>";
+							}
 						}
 					}
 				}
@@ -586,9 +610,9 @@ class menu_nav
 	{
 		log_debug("menu_nav", "Executing render_html()");
 
-		print "<table cellpadding=\"0\" cellspacing=\"0\" border=\"0\" width=\"100%\">";
+		print "<table class=\"menu_nav_table\">";
 		print "<tr>";
-		print "<td width=\"100%\" cellpadding=\"0\" cellborder=\"0\" cellspacing=\"0\">";
+		print "<td>";
 
 		print "<ul id=\"navmenu\">";
 
@@ -599,7 +623,7 @@ class menu_nav
 				// are we viewing the current page?
 				if ($this->structure["selected"] == $this->structure["links"][$i])
 				{
-					print "<li><a style=\"background-color: #60ae62;\" href=\"index.php?". $this->structure["links"][$i] ."\" title=\"". $this->structure["title"][$i] ."\">". $this->structure["title"][$i] ."</a></li>";
+					print "<li><a class=\"menu_nav_current\" href=\"index.php?". $this->structure["links"][$i] ."\" title=\"". $this->structure["title"][$i] ."\">". $this->structure["title"][$i] ."</a></li>";
 				}
 				else
 				{

@@ -22,16 +22,16 @@
 function security_localphp($url)
 {
 	// does the url start with a slash? (/)
-	if (ereg("^/", $url))           { return 0; }
+	if (preg_match("/^\//", $url))			{ return 0; }
 
 	// does the url start with a ../?
-	if (ereg("^\.\./", $url))         { return 0; }
+	if (preg_match("/^\.\.\//", $url))		{ return 0; }
      
 	// does the url (at any point) contain "://" (for ftp://, http://, etc)
-	if (ereg("://", $url))          { return 0; }
+	if (preg_match("/:\/\//", $url))		{ return 0; }
 
 	// make sure the file is a php file!
-	if (!ereg(".php$", $url))       { return 0; }
+	if (!preg_match("/.php$/", $url))		{ return 0; }
 
 	// everything was cool
 	return 1;
@@ -63,6 +63,12 @@ function security_form_input($expression, $valuename, $numchars, $errormsg)
 	// get post data
 	$input = $_POST[$valuename];
 	
+	// if there is a help message set, delete the content
+	if ($_POST[ $valuename ."_helpmessagestatus"] == "true")
+	{
+		$input = "";
+	}
+
 
 	// strip any HTML tags
 	$input = strip_tags($input);
@@ -113,7 +119,7 @@ function security_form_input($expression, $valuename, $numchars, $errormsg)
 		if ($errormsg == "")
 		{
 			$translation	= language_translate_string($_SESSION["user"]["lang"], $valuename);
-			$errormsg	= "Invalid $translation supplied, please correct.";
+			$errormsg	= "Sorry, \"$translation\" must be at least $numchars characters.";
 		}
 
 		// report the error
@@ -148,19 +154,6 @@ function security_form_input($expression, $valuename, $numchars, $errormsg)
 function security_form_input_predefined ($type, $valuename, $numchar, $errormsg)
 {
 	$expression = NULL;
-
-	// if there is no errormsg supplied, set a default one by looking
-	// up the translation of the fieldname and reporting it.
-	//
-	// Note that the security_form_input function will also do this if
-	// required, however we check here first since some of the input types
-	// do processing in this function.
-	//
-	if ($errormsg == "")
-	{
-		$translation	= language_translate_string($_SESSION["user"]["lang"], $valuename);
-		$errormsg	= "Invalid $translation supplied, please correct.";
-	}
 	
 	
 	// run through the actions for each item type
@@ -173,6 +166,15 @@ function security_form_input_predefined ($type, $valuename, $numchar, $errormsg)
 		case "date":
 			// TODO: audit the error handling in this function, seems like it's generating
 			// messages which are used for no reason.
+
+			// if there is no errormsg supplied, set a default one by looking
+			// up the translation of the fieldname and reporting it.
+			if ($errormsg == "")
+			{
+				$translation	= language_translate_string($_SESSION["user"]["lang"], $valuename);
+				$errormsg	= "Invalid $translation supplied, please correct.";
+			}
+
 		
 			// dates are a special field, since they have to be passed
 			// from the form as 3 different inputs, but we want to re-assemble them
@@ -248,8 +250,16 @@ function security_form_input_predefined ($type, $valuename, $numchar, $errormsg)
 			// hourmins is a special field - we want to take
 			// two fields (hours + mins) and add then together
 			// to produce the number of seconds.
-			//
-			
+
+			// if there is no errormsg supplied, set a default one by looking
+			// up the translation of the fieldname and reporting it.
+			if ($errormsg == "")
+			{
+				$translation	= language_translate_string($_SESSION["user"]["lang"], $valuename);
+				$errormsg	= "Invalid $translation supplied, please correct.";
+			}
+
+
 			$time_hh	= intval($_POST[$valuename."_hh"]);
 			$time_mm	= intval($_POST[$valuename."_mm"]);
 
@@ -283,6 +293,18 @@ function security_form_input_predefined ($type, $valuename, $numchar, $errormsg)
 
 		case "money":
 
+			// if there is no errormsg supplied, set a default one by looking
+			// up the translation of the fieldname and reporting it.
+			if ($errormsg == "")
+			{
+				$translation	= language_translate_string($_SESSION["user"]["lang"], $valuename);
+				$errormsg	= "Invalid $translation supplied, please correct.";
+			}
+			// replace configs with standard symbols for processing
+			$config_array = array($GLOBALS["config"]["CURRENCY_DEFAULT_SYMBOL"], $GLOBALS["config"]["CURRENCY_DEFAULT_THOUSANDS_SEPARATOR"], $GLOBALS["config"]["CURRENCY_DEFAULT_DECIMAL_SEPARATOR"]);
+			$default_array = array("", "", ".");
+			$formatted_string = str_replace($config_array, $default_array, $_POST[$valuename]);
+			$_POST[$valuename] = $formatted_string;
 			// verify as a floating point number
 			$expression = "/^[0-9]*.[0-9]*$/";
 			$value = security_form_input($expression, $valuename, $numchar, $errormsg);
@@ -324,6 +346,46 @@ function security_form_input_predefined ($type, $valuename, $numchar, $errormsg)
 		case "email":
 			$expression = "/^([A-Za-z0-9._-])+\@(([A-Za-z0-9-])+\.)+([A-Za-z0-9])+$/";
 		break;
+		
+		case "multiple_email":
+			// Single email address
+			$email_regex = "/^<?(([A-Za-z0-9._-])+\@(([A-Za-z0-9-])+\.)+([A-Za-z0-9])+)>?$/";	
+			
+			// Whole email address string
+			$expression = "/^(([A-Za-z0-9._-])+\@(([A-Za-z0-9-])+\.)+([A-Za-z0-9])+,?\s?)+$/";
+			
+			// grab submitted data from $_POST 
+			$unsafe_email_addresses = $_POST[$valuename];	
+			
+			// split at spaces and commas
+			$email_address_string_parts = preg_split("/[\s,]+/", $unsafe_email_addresses);
+			
+			$email_addresses = array();
+			foreach($email_address_string_parts as $email_address_string_part)
+			{
+				// check each item against the email address regex, capture the email address
+				preg_match($email_regex, $email_address_string_part, $matches);
+				// if we have an email address, add it to the array
+				if($matches[1] != '')
+				{
+					$email_addresses[] = $matches[1];
+				}
+			}
+			// implode the email addresses using a comma and a space
+			$new_email_address_string = implode(", ",$email_addresses);
+			
+			// recheck the string., if it passes, return it
+			preg_match($expression, $new_email_address_string, $matches);
+			if($matches[0] == $new_email_address_string)
+			{
+				return $matches[0];
+			} 
+			else
+			{
+				return "error";
+			}
+		break;
+		
 
 		case "ipv4":
 			$expression = "/^(?:25[0-5]|2[0-4]\d|1\d\d|[1-9]\d|\d)(?:[.](?:25[0-5]|2[0-4]\d|1\d\d|[1-9]\d|\d)){3}$/";
@@ -361,19 +423,12 @@ function security_form_input_predefined ($type, $valuename, $numchar, $errormsg)
 	Success: Returns the value.
 	Failure: Returns "error".
 */
-function security_script_input($expression, $value)
+function security_script_input ($expression, $value)
 {
 	// if the input matches the regex, all is good, otherwise set to "error".
 	if (preg_match($expression, $value))
 	{
-	        // check if magic quotes is on or off and process the input correctly.
-	        //
-	        // this prevents SQL injections, by backslashing -- " ' ` \ -- etc.
-	        //
-		if (get_magic_quotes_gpc() == 0)
-		{
-			$value = addslashes($value);
-		}
+		$value = addslashes($value);
 
 		return $value;
 	}
@@ -431,7 +486,7 @@ function security_script_input_predefined ($type, $value)
 			// to produce the number of seconds.
 
 			// calculate the time in seconds
-			$time	= split(":", $value);
+			$time	= explode(":", $value);
 			$value	= ($time[1] * 60) + (($time[0] * 60) * 60);
 
 			$expression = "/^[0-9]*$/";
@@ -479,7 +534,7 @@ function security_script_input_predefined ($type, $value)
 
 	}
 
-	return security_script_input($expression, $value);
+	return @security_script_input($expression, $value);
 }
 
 

@@ -23,6 +23,7 @@ class form_input
 	var $sql_query;			// SQL query used to fetch data
 	
 	var $subforms;			// associative array of sub form titles and contents
+	var $subforms_grouped;		// grouped subform items
 	var $structure;			// array structure of all variables and options
 	var $actions;			// array structure of javascript actions
 
@@ -89,22 +90,22 @@ class form_input
 		log_debug("form", "Executing load_data()");
 
 		// error data has highest perference
-		if ($_SESSION["error"]["form"][$this->formname])
+		if (isset($_SESSION["error"]["form"][$this->formname]))
 		{
 			return $this->load_data_error();
 		}
 
 		// if enabled, and data exists, fetch information from session form
-		if ($this->sessionform)
+		if (isset($this->sessionform))
 		{
-			if ($_SESSION["form"][$this->sessionform])
+			if (isset($_SESSION["form"][$this->sessionform]))
 			{
 				return $this->load_data_session();
 			}
 		}
 	
 		// if a SQL query has been provided, fetch information from SQL DB
-		if ($this->sql_query)
+		if (isset($this->sql_query))
 		{
 			return $this->load_data_sql();
 		}
@@ -125,7 +126,7 @@ class form_input
 	{
 		log_debug("form", "Executing load_data_error()");
 	
-		if ($_SESSION["error"]["form"][$this->formname])
+		if (isset($_SESSION["error"]["form"][$this->formname]))
 		{
 
 			foreach (array_keys($this->structure) as $fieldname)
@@ -152,7 +153,7 @@ class form_input
 					case "hidden":
 
 						// only set the field if a value has been provided - ie: don't set to blank for any reason
-						if ($_SESSION["error"]["$fieldname"])
+						if (isset($_SESSION["error"]["$fieldname"]) && ($_SESSION["error"]["$fieldname"] != ''))
 						{
 							$this->structure[$fieldname]["defaultvalue"] = stripslashes($_SESSION["error"][$fieldname]);
 						}
@@ -161,7 +162,11 @@ class form_input
 
 					default:
 						// set the default value
-						$this->structure[$fieldname]["defaultvalue"] = stripslashes($_SESSION["error"][$fieldname]);
+				
+						if (isset($_SESSION["error"]["$fieldname"]))
+						{
+							$this->structure[$fieldname]["defaultvalue"] = stripslashes($_SESSION["error"][$fieldname]);
+						}
 					break;
 				}
 			}
@@ -262,7 +267,7 @@ class form_input
 				// insert the data into the structure value as the default value
 				foreach (array_keys($this->structure) as $fieldname)
 				{
-					if ($data[$fieldname])
+					if (isset($data[$fieldname]))
 					{
 						$this->structure[$fieldname]["defaultvalue"] = $data[$fieldname];
 					}
@@ -307,17 +312,63 @@ class form_input
 	function render_row ($fieldname)
 	{
 		log_debug("form", "Executing render_row($fieldname)");
-	
-	
-		// if the fieldname has experienced an error, we want to highlight the field
-		if ($_SESSION["error"]["$fieldname-error"])
+		
+		//create array of classes
+		$class_array = array();
+		if(isset($this->structure[$fieldname]["options"]["css_row_class"]))
+		{		
+			if (is_array($this->structure[$fieldname]["options"]["css_row_class"]))
+			{
+				array_merge($class_array, $this->structure[$fieldname]["options"]["css_row_class"]);
+			}
+			else
+			{
+				$class_array[] = $this->structure[$fieldname]["options"]["css_row_class"];
+			}
+		}
+		
+		if (isset($_SESSION["error"]["$fieldname-error"]))
 		{
-			print "<tr class=\"form_error\">";
+			$class_array[] = "form_error";
+		}
+		
+		if (isset($this->structure[$fieldname]["options"]["css_row_id"]))
+		{
+			print "<tr id=\"". $this->structure[$fieldname]["options"]["css_row_id"] ."\" ";
 		}
 		else
 		{
-			print "<tr id=\"$fieldname\">";
+			print "<tr id=\"$fieldname\" ";
 		}
+		
+		if (count($class_array) > 0)
+		{
+			print "class=\"";
+			foreach ($class_array as $class)
+			{
+				print $class ." ";
+			}
+			print "\"";
+		}
+		print ">";
+	
+		// if the fieldname has experienced an error, we want to highlight the field
+//		if (isset($_SESSION["error"]["$fieldname-error"]))
+//		{
+//			print "<tr class=\"form_error\">";
+//		}
+//		elseif ($this->structure[$fieldname]["options"]["css_row_class"])
+//		{
+//			print "<tr class=\"". $this->structure[$fieldname]["options"]["css_row_class"] ."\">";
+//		}
+//		elseif ($this->structure[$fieldname]["options"]["css_row_id"])
+//		{
+//			print "<tr id=\"". $this->structure[$fieldname]["options"]["css_row_id"] ."\">";
+//		}
+//		else
+//		{
+//			print "<tr id=\"$fieldname\">";
+//		}
 
 		switch ($this->structure[$fieldname]["type"])
 		{
@@ -329,8 +380,10 @@ class form_input
 				$req = 0;
 				foreach (array_keys($this->structure) as $tmp_fieldname)
 				{
-					if ($this->structure[$tmp_fieldname]["options"]["req"])
+					if (isset($this->structure[$tmp_fieldname]["options"]["req"]))
+					{
 						$req = 1;
+					}
 				}
 
 				if ($req)
@@ -351,19 +404,30 @@ class form_input
 
 			default:
 			
-				if ($this->structure[$fieldname]["options"]["no_fieldname"])
+				if (isset($this->structure[$fieldname]["options"]["no_fieldname"]))
 				{
-					// display the form field, but do no display the column for the fieldname
-					print "<td colspan=\"2\" width=\"100%\">";
-
-					$this->render_field($fieldname);
-
-					print "</td>";
+					if (isset ($this->structure[$fieldname]["options"]["no_shift"]))
+					{
+						//leave left column blank
+						print "<td width=\"30%\" valign=\"top\">&nbsp;</td>";
+						print "<td width=\"70%\">";
+							$this->render_field($fieldname);
+						print "</td>";
+					}
+					else
+					{
+						// display the form field, but do no display the column for the fieldname
+						print "<td colspan=\"2\" width=\"100%\">";
+	
+						$this->render_field($fieldname);
+	
+						print "</td>";
+					}
 				}
 				else
 				{
 					// field name
-					if (!$this->structure[$fieldname]["options"]["no_translate_fieldname"])
+					if (!isset($this->structure[$fieldname]["options"]["no_translate_fieldname"]))
 					{
 						$translation = language_translate_string($this->language, $fieldname);
 					}
@@ -377,8 +441,10 @@ class form_input
 					print "<td width=\"30%\" valign=\"top\">";
 					print $translation;
 					
-					if ($this->structure[$fieldname]["options"]["req"])
+					if (isset($this->structure[$fieldname]["options"]["req"]))
+					{
 						print " *";
+					}
 					
 					print "</td>";
 
@@ -410,6 +476,7 @@ class form_input
 			$option_array["type"]			Type of form input
 
 				input		- standard input box
+				money		- standard input box with formating for money entry
 				password	- password input box
 				hidden		- hidden field
 				text		- text only display, with hidden field as well
@@ -434,6 +501,7 @@ class form_input
 			$option_array["options"]
 						["no_translate_fieldname"]	Set to "yes" to disable language translation for field names
 						["no_fieldname"]		Do not render a field name and shift the data left by 1 column
+						["no_shift"]			For use with no_fieldname option- keeps field in second column
 						["req"]				Set to "yes" to mark the field as being required
 						["max_length"]			Max length for input types
 						["wrap"]			Enable/disable wrapping for textarea boxes (set to either on or off)
@@ -446,7 +514,21 @@ class form_input
 										^ - OBSOLETE: this option should be replaced by autoselect option		
 						["autoselect"]			Enabling this option will cause a radio or dropdown with just a single
 										entry to auto-select the single entry.
-		
+						["nohidden"]			Disables the hidden field on text fields
+ 						["css_row_class"]		Set the CSS class to a custom option for the rendered table row.
+ 						["css_row_id"]			Set the CSS id to a custom option for the rendered table row.
+											(note: by default, table rows have their ID set to the name of the fieldname)
+						["css_field_class"]		Set the CSS class of a field
+						["search_filter"]		Enable/disable the optional text box to allow search/ filtering of a dropdown
+ 						["help"]			In-field help message for input and textarea types. Is ignored if defaultvalue is set.
+ 						["disabled"]			Disables the field if set to yes
+						["autocomplete"]		Autocomplete option for input fields, it will display a dropdown that filters
+											as the user types, using the Jquery Autocomplete UI functions. Options are
+											currenly "sql" to use a SQL query set in ["options"]["autocomplete_sql"] and 
+											returning the column "label" to be used for the dropdown.
+						["nolabel"]			Set to true to remove labels from checkboxes, etc
+
+
 			$option_array["values"] = array();			Array of values - used for radio or dropdown type fields
 			$option_array["translations"] = array();		Associate array used for labeling the values in radio or dropdown type fields
 		
@@ -455,101 +537,265 @@ class form_input
 	{
 		log_debug("form", "Executing render_field($fieldname)");
 		
+		$helpmessagestatus = "false";
+		
 		switch ($this->structure[$fieldname]["type"])
 		{
 			case "input":
 				// set default size
-				if (!$this->structure[$fieldname]["options"]["width"])
+				if (!isset($this->structure[$fieldname]["options"]["width"]))
+				{
 					$this->structure[$fieldname]["options"]["width"] = 250;
+				}
 		
 				// optional prefix label/description
-				print $this->structure[$fieldname]["options"]["prelabel"];
+				if (isset($this->structure[$fieldname]["options"]["prelabel"]))
+				{
+					print $this->structure[$fieldname]["options"]["prelabel"];
+				}
 
 				// display
-				print "<input name=\"$fieldname\" ";
-				print "value=\"". $this->structure[$fieldname]["defaultvalue"] ."\" ";
+				print "<input id=\"$fieldname\" name=\"$fieldname\" ";
+				
+				if (isset($this->structure[$fieldname]["defaultvalue"]))
+				{
+					print "value=\"". htmlentities($this->structure[$fieldname]["defaultvalue"], ENT_QUOTES, "UTF-8") ."\" ";
+				}
+ 				elseif (isset($this->structure[$fieldname]["options"]["help"]))
+ 				{
+ 					print "class=\"helpmessage\" ";
+ 					print "value=\"". $this->structure[$fieldname]["options"]["help"] ."\" ";
+ 					$helpmessagestatus = "true";
+ 				}
+			
+				if (isset($this->structure[$fieldname]["options"]["css_field_class"]))	
+				{
+					print "class=\"". $this->structure[$fieldname]["options"]["css_field_class"] ."\" ";
+				}			
 
-				if ($this->structure[$fieldname]["options"]["max_length"])
+				if (isset($this->structure[$fieldname]["options"]["max_length"]))
 					print "maxlength=\"". $this->structure[$fieldname]["options"]["max_length"] ."\" ";
+					
+				if (isset($this->structure[$fieldname]["options"]["disabled"]) && ($this->structure[$fieldname]["options"]["disabled"] == "yes"))
+					print "disabled=\"disabled\" ";
 				
 				print "style=\"width: ". $this->structure[$fieldname]["options"]["width"] ."px;\">";
 
 				// optional label/description
-				print $this->structure[$fieldname]["options"]["label"];
+				if (isset($this->structure[$fieldname]["options"]["label"]))
+				{
+					print $this->structure[$fieldname]["options"]["label"];
+				}
 
+				print "<input type=\"hidden\" name=\"".$fieldname."_helpmessagestatus\" value=\"".$helpmessagestatus."\">";
 			break;
+
+
+			case "money":
+				// set default size
+				if (!isset($this->structure[$fieldname]["options"]["width"]))
+				{
+					$this->structure[$fieldname]["options"]["width"] = 50;
+				}
+
+
+				// optional prefix label/description
+				if (isset($this->structure[$fieldname]["options"]["prelabel"]))
+				{
+					print $this->structure[$fieldname]["options"]["prelabel"];
+				}
+
+
+				// check where to set the currency symbol
+				$position = sql_get_singlevalue("SELECT value FROM config WHERE name='CURRENCY_DEFAULT_SYMBOL_POSITION'");
+
+				if ($position == "before")
+				{
+					print sql_get_singlevalue("SELECT value FROM config WHERE name='CURRENCY_DEFAULT_SYMBOL'") ." ";
+				}
+	
+		
+				// display
+				print "<input name=\"$fieldname\" ";
+				if (isset($this->structure[$fieldname]["defaultvalue"]))
+				{	
+					print "value=\"". format_money($this->structure[$fieldname]["defaultvalue"], 1) ."\" ";
+				}
+ 				elseif (isset($this->structure[$fieldname]["options"]["help"]))
+ 				{
+ 					print "class=\"helpmessage\" ";
+ 					print "value=\"". $this->structure[$fieldname]["options"]["help"] ."\" ";
+ 					$helpmessagestatus = "true";
+ 				}
+ 
+				if (isset($this->structure[$fieldname]["options"]["max_length"]))
+					print "maxlength=\"". $this->structure[$fieldname]["options"]["max_length"] ."\" ";
+					
+				if (isset($this->structure[$fieldname]["options"]["disabled"]) && ($this->structure[$fieldname]["options"]["disabled"] == "yes"))
+					print "disabled=\"disabled\" ";
+					
+				if (isset($this->structure[$fieldname]["options"]["css_field_class"]))	
+				{
+					print "class=\"". $this->structure[$fieldname]["options"]["css_field_class"] ."\" ";
+				}			
+					
+				
+				print "style=\"width: ". $this->structure[$fieldname]["options"]["width"] ."px;\">";
+
+
+				if ($position == "after")
+				{
+					print " ". sql_get_singlevalue("SELECT value FROM config WHERE name='CURRENCY_DEFAULT_SYMBOL'");
+				}
+
+				print " ". sql_get_singlevalue("SELECT value FROM config WHERE name='CURRENCY_DEFAULT_NAME'");
+
+				// optional label/description
+				if (isset($this->structure[$fieldname]["options"]["label"]))
+				{
+					print $this->structure[$fieldname]["options"]["label"];
+				}
+				
+				print "<input type=\"hidden\" name=\"".$fieldname."_helpmessagestatus\" value=\"".$helpmessagestatus."\">";
+			break;
+
 
 			case "password":
 				
 				// optional prefix label/description
-				print $this->structure[$fieldname]["options"]["prelabel"];
+				if (isset($this->structure[$fieldname]["options"]["prelabel"]))
+				{
+					print $this->structure[$fieldname]["options"]["prelabel"];
+				}
+
 
 				// set default size
-				if (!$this->structure[$fieldname]["options"]["width"])
+				if (empty($this->structure[$fieldname]["options"]["width"]))
 					$this->structure[$fieldname]["options"]["width"] = 250;
 		
 				// display
-				print "<input type=\"password\" name=\"$fieldname\" value=\"". $this->structure[$fieldname]["defaultvalue"] ."\" style=\"width: ". $this->structure[$fieldname]["options"]["width"] ."px;\">";
+				print "<input type=\"password\" name=\"$fieldname\"";
+
+				if (isset($this->structure[$fieldname]["defaultvalue"]))
+				{
+					print " value=\"". $this->structure[$fieldname]["defaultvalue"]. "\" " ;
+				}
+				
+				if (isset($this->structure[$fieldname]["options"]["disabled"]) && ($this->structure[$fieldname]["options"]["disabled"] == "yes"))
+					print "disabled=\"disabled\" ";
+					
+				if (isset($this->structure[$fieldname]["options"]["css_field_class"]))	
+				{
+					print "class=\"". $this->structure[$fieldname]["options"]["css_field_class"] ."\" ";
+				}			
+					
+				print "style=\"width: ". $this->structure[$fieldname]["options"]["width"] ."px;\">";
 
 				// optional label/description
-				print $this->structure[$fieldname]["options"]["label"];
+				if (isset($this->structure[$fieldname]["options"]["label"]))
+				{
+					print $this->structure[$fieldname]["options"]["label"];
+				}
 			break;
 			
 			case "hidden":
+			
+				if (!isset($this->structure[$fieldname]["defaultvalue"]))
+				{
+						$this->structure[$fieldname]["defaultvalue"] = '';
+				}
 				print "<input type=\"hidden\" name=\"$fieldname\" value=\"". $this->structure[$fieldname]["defaultvalue"] ."\">";
 			break;
 
 			case "text":
-
+		
+				if (!isset($this->structure[$fieldname]["defaultvalue"]))
+				{
+						$this->structure[$fieldname]["defaultvalue"] = '';
+				}
 				$translation = language_translate_string($this->language, $this->structure[$fieldname]["defaultvalue"]);
 
 				print "$translation";
-				print "<input type=\"hidden\" name=\"$fieldname\" value=\"". $this->structure[$fieldname]["defaultvalue"] ."\">";
+
+				if (!isset($this->structure[$fieldname]["options"]["nohidden"]))
+				{
+					print "<input type=\"hidden\" name=\"$fieldname\" value=\"". $this->structure[$fieldname]["defaultvalue"] ."\">";
+				}
 			break;
 
 			case "textarea":
 				
 				// set default size
-				if (!$this->structure[$fieldname]["options"]["width"])
+				if (!isset($this->structure[$fieldname]["options"]["width"]))
 					$this->structure[$fieldname]["options"]["width"] = 300;
 					
-				if (!$this->structure[$fieldname]["options"]["height"])
+				if (!isset($this->structure[$fieldname]["options"]["height"]))
 					$this->structure[$fieldname]["options"]["height"] = 35;
 
 				// optional prefix label/description
-				print $this->structure[$fieldname]["options"]["prelabel"];
+				if (isset($this->structure[$fieldname]["options"]["prelabel"]))
+				{
+					print $this->structure[$fieldname]["options"]["prelabel"];
+				}
 
 				// display
 				print "<textarea name=\"$fieldname\" ";
 				
-				if ($this->structure[$fieldname]["options"]["wrap"])
+				if (isset($this->structure[$fieldname]["options"]["wrap"]))
 				{
 					print "wrap=\"". $this->structure[$fieldname]["options"]["wrap"] ."\" ";
 				}
+				
+				if ( isset($this->structure[$fieldname]["options"]["disabled"]) && ($this->structure[$fieldname]["options"]["disabled"] == "yes"))
+					print "disabled=\"disabled\" ";
+					
+				if (isset($this->structure[$fieldname]["options"]["css_field_class"]))	
+				{
+					print "class=\"". $this->structure[$fieldname]["options"]["css_field_class"] ."\" ";
+				}			
+					
+				print "style=\"width: ". $this->structure[$fieldname]["options"]["width"] ."px; height: ". $this->structure[$fieldname]["options"]["height"] ."px;\">";
 
-				print "style=\"width: ". $this->structure[$fieldname]["options"]["width"] ."px; height: ". $this->structure[$fieldname]["options"]["height"] ."px;\" ";
-				print ">". $this->structure[$fieldname]["defaultvalue"] ."</textarea>";
+				if (isset($this->structure[$fieldname]["defaultvalue"]))
+				{
+					print $this->structure[$fieldname]["defaultvalue"];
+				}
+
+				print "</textarea>";
 
 				// optional label/description
-				print $this->structure[$fieldname]["options"]["label"];
+				if (isset($this->structure[$fieldname]["options"]["label"]))
+				{
+					print $this->structure[$fieldname]["options"]["label"];
+				}
 			break;
 
 			case "date":
 				
 				// optional prefix label/description
-				print $this->structure[$fieldname]["options"]["prelabel"];
-
-				if ($this->structure[$fieldname]["defaultvalue"] == "0000-00-00" || $this->structure[$fieldname]["defaultvalue"] == 0)
+				if (isset($this->structure[$fieldname]["options"]["prelabel"]))
 				{
-					$date_a = array("","","");
+					print $this->structure[$fieldname]["options"]["prelabel"];
+				}
+
+				if (isset($this->structure[$fieldname]["defaultvalue"]))
+				{
+					if ($this->structure[$fieldname]["defaultvalue"] == "0000-00-00" || $this->structure[$fieldname]["defaultvalue"] == 0)
+					{
+						$date_a = array("","","");
+					}
+					else
+					{
+						$date_a = explode("-", $this->structure[$fieldname]["defaultvalue"]);
+					}
 				}
 				else
 				{
-					$date_a = split("-", $this->structure[$fieldname]["defaultvalue"]);
+						$date_a = array("","","");
 				}
 
 				// get the format the date field needs to be shown in
-				if ($_SESSION["user"]["dateformat"])
+				if (isset($_SESSION["user"]["dateformat"]))
 				{
 					// fetch from user preferences
 					$format = $_SESSION["user"]["dateformat"];
@@ -589,21 +835,28 @@ class form_input
 
 
 				// optional label/description
-				print $this->structure[$fieldname]["options"]["label"];
+				if (isset($this->structure[$fieldname]["options"]["label"]))
+				{
+					print $this->structure[$fieldname]["options"]["label"];
+				}
+
 			break;
 
 			case "timestamp_date":
 
 				// optional prefix label/description
-				print $this->structure[$fieldname]["options"]["prelabel"];
+				if (isset($this->structure[$fieldname]["options"]["prelabel"]))
+				{
+					print $this->structure[$fieldname]["options"]["prelabel"];
+				}
 
-				if ($this->structure[$fieldname]["defaultvalue"] == 0)
+				if (empty($this->structure[$fieldname]["defaultvalue"]))
 				{
 					$date_a = array("","","");
 				}
 				else
 				{
-					$date_a = split("-", date("Y-m-d", $this->structure[$fieldname]["defaultvalue"]));
+					$date_a = explode("-", date("Y-m-d", $this->structure[$fieldname]["defaultvalue"]));
 				}
 				
 				print "<input name=\"". $fieldname ."_dd\" style=\"width: 25px;\" maxlength=\"2\" value=\"". $date_a[2] ."\"> ";
@@ -615,30 +868,41 @@ class form_input
 
 
 				// optional label/description
-				print $this->structure[$fieldname]["options"]["label"];
+				if (isset($this->structure[$fieldname]["options"]["label"]))
+				{
+					print $this->structure[$fieldname]["options"]["label"];
+				}
+
 			break;
 
 			case "hourmins":
-				if ($this->structure[$fieldname]["defaultvalue"] == 0)
+				if (empty($this->structure[$fieldname]["defaultvalue"]))
 				{
 					$time_hours	= "";
 					$time_mins	= "";
 				}
 				else
 				{
-					$time_processed	= split(":", time_format_hourmins($this->structure[$fieldname]["defaultvalue"]));
+					$time_processed	= explode(":", time_format_hourmins($this->structure[$fieldname]["defaultvalue"]));
 					$time_hours	= $time_processed[0];
 					$time_mins	= $time_processed[1];
 				}
 
 				// optional prefix label/description
-				print $this->structure[$fieldname]["options"]["prelabel"];
+				if (isset($this->structure[$fieldname]["options"]["prelabel"]))
+				{
+					print $this->structure[$fieldname]["options"]["prelabel"];
+				}
 
 				print "<input name=\"". $fieldname ."_hh\" style=\"width: 25px;\" maxlength=\"2\" value=\"$time_hours\"> hours ";
 				print "<input name=\"". $fieldname ."_mm\" style=\"width: 25px;\" maxlength=\"2\" value=\"$time_mins\"> mins";
 
 				// optional label/description
-				print $this->structure[$fieldname]["options"]["label"];	
+				if (isset($this->structure[$fieldname]["options"]["label"]))
+				{
+					print $this->structure[$fieldname]["options"]["label"];
+				}
+
 			break;
 			
 			case "radio":
@@ -652,10 +916,12 @@ class form_input
 				*/
 
 				// optional prefix label/description
-				print $this->structure[$fieldname]["options"]["prelabel"];
-
+				if (isset($this->structure[$fieldname]["options"]["prelabel"]))
+				{
+					print $this->structure[$fieldname]["options"]["prelabel"];
+				}
 				
-				if ($this->structure[$fieldname]["translations"])
+				if (isset($this->structure[$fieldname]["translations"]))
 				{
 					$translations = $this->structure[$fieldname]["translations"];
 				}
@@ -667,7 +933,7 @@ class form_input
 
 
 				// if there is only 1 option avaliable, see if we should auto-select it.
-				if ($this->structure[$fieldname]["options"]["autoselect"] && $this->structure[$fieldname]["values"])
+				if (isset($this->structure[$fieldname]["options"]["autoselect"]) && isset($this->structure[$fieldname]["values"]))
 				{
 					if (count($this->structure[$fieldname]["values"]) == 1)
 					{
@@ -675,11 +941,15 @@ class form_input
 					}
 				}
 
-				// display all the radios buttons
+				// display all the radio buttons
 				foreach ($this->structure[$fieldname]["values"] as $value)
 				{
 					// is the current row, the one that is in use? If so, add the 'selected' tag to it
-					if ($value == $this->structure[$fieldname]["defaultvalue"] || $autoselect)
+					if (isset($this->structure[$fieldname]["defaultvalue"]) && $value == $this->structure[$fieldname]["defaultvalue"])
+					{
+						print "<input checked ";
+					}
+					elseif (isset($autoselect))
 					{
 						print "<input checked ";
 					}
@@ -689,7 +959,7 @@ class form_input
 					}
 
 					// if actions enabled, configure all the actions that have been defined
-					if ($this->actions[$fieldname])
+					if (isset($this->actions[$fieldname]))
 					{
 						print "onclick=\"";
 
@@ -719,37 +989,51 @@ class form_input
 						print "\" ";
 					}
 					
-					print "type=\"radio\" style=\"border: 0px\" name=\"$fieldname\" value=\"$value\">" . $translations[$value] ."<br>";
+					if (isset($this->structure[$fieldname]["options"]["disabled"]) && ($this->structure[$fieldname]["options"]["disabled"] == "yes"))
+						print "disabled=\"disabled\" ";
+						
+					if (isset($this->structure[$fieldname]["options"]["css_field_class"]))	
+					{
+						print "class=\"". $this->structure[$fieldname]["options"]["css_field_class"] ."\" ";
+					}			
+						
+					
+					if ($this->structure[$fieldname]["options"]["disabled"] == "yes")
+						print "disabled=\"disabled\" ";
+					
+					print "type=\"radio\" style=\"border: 0px\" name=\"$fieldname\" value=\"$value\" id=\"". $fieldname ."_". $value ."\">";
+					print "<label for=\"". $fieldname ."_". $value ."\">". $translations[$value] ."</label><br>";
 				}
 
 				// optional label/description
-				print $this->structure[$fieldname]["options"]["label"];
-				
+				if (isset($this->structure[$fieldname]["options"]["label"]))
+				{
+					print $this->structure[$fieldname]["options"]["label"];
+				}
+
 			break;
 
 			case "checkbox":
 
 				// optional prefix label/description
-				print $this->structure[$fieldname]["options"]["prelabel"];
+				if (isset($this->structure[$fieldname]["options"]["prelabel"]))
+				{
+					print $this->structure[$fieldname]["options"]["prelabel"];
+				}
 
 
+				// render form field
 				print "<input ";
 
-				if ($this->structure[$fieldname]["defaultvalue"] == "on" || $this->structure[$fieldname]["defaultvalue"] == "1" || $this->structure[$fieldname]["defaultvalue"] == "enabled")
-					print "checked ";
-
-				if ($this->structure[$fieldname]["options"]["label"])
+				if (isset($this->structure[$fieldname]["defaultvalue"]))
 				{
-					$translation = $this->structure[$fieldname]["options"]["label"];
+					if ($this->structure[$fieldname]["defaultvalue"] == "on" || $this->structure[$fieldname]["defaultvalue"] == "1" || $this->structure[$fieldname]["defaultvalue"] == "enabled")
+					{
+						print "checked ";
+					}
 				}
-				else
-				{
-					$translation = language_translate_string($this->language, $fieldname);
-				}
-
-
 				// if actions enabled, configure all the actions that have been defined
-				if ($this->actions[$fieldname])
+				if (isset($this->actions[$fieldname]))
 				{
 					print "onclick=\"";
 
@@ -774,16 +1058,48 @@ class form_input
 					
 					print "\" ";
 				}
+				
+				if (isset($this->structure[$fieldname]["options"]["disabled"]) && ($this->structure[$fieldname]["options"]["disabled"] == "yes"))
+					print "disabled=\"disabled\" ";
+					
+				if (isset($this->structure[$fieldname]["options"]["css_field_class"]))	
+				{
+					print "class=\"". $this->structure[$fieldname]["options"]["css_field_class"] ."\" ";
+				}			
+					
+
+				if ($this->structure[$fieldname]["options"]["disabled"] == "yes")
+					print "disabled=\"disabled\" ";
+					
+				print "type=\"checkbox\" style=\"border: 0px\" name=\"". $fieldname ."\" id=\"". $fieldname ."\">";
 
 
-				print "type=\"checkbox\" style=\"border: 0px\" name=\"". $fieldname ."\">". $translation ."<br>";
+
+				// post field label
+				if (!isset($this->structure[$fieldname]["options"]["nolabel"]))
+				{
+					if (isset($this->structure[$fieldname]["options"]["label"]))
+					{
+						$translation = $this->structure[$fieldname]["options"]["label"];
+					}
+					else
+					{
+						$translation = language_translate_string($this->language, $fieldname);
+					}
+	
+					print "<label for=\"$fieldname\">$translation</label><br>";
+				}
+
 
 			break;
 
 			case "dropdown":
 
 				// optional prefix label/description
-				print $this->structure[$fieldname]["options"]["prelabel"];
+				if (isset($this->structure[$fieldname]["options"]["prelabel"]))
+				{
+					print $this->structure[$fieldname]["options"]["prelabel"];
+				}
 
 				/*
 					there are two ways to draw drop down tables:
@@ -796,11 +1112,61 @@ class form_input
 
 				
 				// set default size
-				if (!$this->structure[$fieldname]["options"]["width"])
+				if (!isset($this->structure[$fieldname]["options"]["width"]))
 					$this->structure[$fieldname]["options"]["width"] = 250;
+					
 			
+				// create value array if the SQL has not been executed yet
+				if (is_string($this->structure[$fieldname]["values"]))
+				{
+					if(!empty($this->structure[$fieldname]["defaultvalue"]))
+					{
+						$query = str_replace("CURRENTID", $this->structure[$fieldname]["defaultvalue"], $this->structure[$fieldname]["values"]);
+					}
+					else
+					{
+						$query = str_replace("CURRENTID", "0", $this->structure[$fieldname]["values"]);
+					}
+					$this->structure[$fieldname]["values"] = array();
+					
+					$sql_obj		= New sql_query;
+					$sql_obj->string	= $query;
+					$sql_obj->execute();
+					
+					if ($sql_obj->num_rows())
+					{
+						$sql_obj->fetch_array();
+						foreach ($sql_obj->data as $data)
+						{
+							// merge multiple labels into a single label
+							$label = $data["label"];
 
-				if ($this->structure[$fieldname]["translations"])
+							for ($i=0; $i < count(array_keys($data)); $i++)
+							{
+								if (!empty($data["label$i"]))
+								{
+									$label .= " -- ". $data["label$i"];
+								}
+							}				
+
+							// only add an option if there is an id and label for it
+							if ($data["id"] && $label)
+							{
+								$this->structure[$fieldname]["values"][]			= $data["id"];
+								$this->structure[$fieldname]["translations"][ $data["id"] ]	= $label;
+							}
+						}
+					}
+					else
+					{
+						print "No ". language_translate_string($_SESSION["user"]["lang"], $fieldname) ." avaliable.";
+						print "<input type=\"hidden\" name=\"$fieldname\" value=\"". "No ". language_translate_string($_SESSION["user"]["lang"], $fieldname) ." avaliable." ."\">";
+						break;
+					}
+				}
+				
+				
+				if (isset($this->structure[$fieldname]["translations"]))
 				{
 					$translations = $this->structure[$fieldname]["translations"];
 				}
@@ -810,47 +1176,70 @@ class form_input
 					$translations = language_translate($this->language, $this->structure[$fieldname]["values"]);
 				}
 
+				// input box for filtering
+				if (isset($this->structure[$fieldname]["options"]["search_filter"]))
+				{
+					// subtact filter width from form element width
+					$width_filter	= 100;							// px
+					$width_element	= $this->structure[$fieldname]["options"]["width"];	// total
+
+					$this->structure[$fieldname]["options"]["width"] = $width_element - $width_filter;
+
+					// write filter field
+					print "<input id=\"_" .$fieldname. "\" class=\"dropdown_filter\" style=\"width:". $width_filter ."px\"";
+					
+					if ( isset($this->structure[$fieldname]["options"]["disabled"]) && ($this->structure[$fieldname]["options"]["disabled"] == "yes"))
+						print "disabled=\"disabled\" ";
+					print "/>&nbsp;";
+				}
 
 				// start dropdown/select box
-				print "<select name=\"$fieldname\" size=\"1\" style=\"width: ". $this->structure[$fieldname]["options"]["width"] ."px;\"> ";
-
+				print "<select name=\"$fieldname\" size=\"1\" style=\"width: ". $this->structure[$fieldname]["options"]["width"] ."px;\"";
+				if ( isset($this->structure[$fieldname]["options"]["disabled"]) && ($this->structure[$fieldname]["options"]["disabled"] == "yes"))
+					print "disabled=\"disabled\" ";
+					
+				if (isset($this->structure[$fieldname]["options"]["css_field_class"]))	
+				{
+					print "class=\"". $this->structure[$fieldname]["options"]["css_field_class"] ."\" ";
+				}			
+					
+				print "> ";
+				
 
 				// if there is only 1 option avaliable, see if we should auto-select it.
-				if ($this->structure[$fieldname]["options"]["noselectoption"])
+				if (!empty($this->structure[$fieldname]["options"]["noselectoption"]))
 				{
 					$this->structure[$fieldname]["options"]["autoselect"];
 					log_write("warning", "inc_forms", "obsolete usage of noselectoption dropdown option for field $fieldname");
 				}
 
 				
-				if ($this->structure[$fieldname]["options"]["autoselect"] && $this->structure[$fieldname]["values"])
+				if (!empty($this->structure[$fieldname]["options"]["autoselect"]) && !empty($this->structure[$fieldname]["values"]))
 				{
 					if (count($this->structure[$fieldname]["values"]) == 1)
 					{
 						$autoselect = 1;
 					}
 				}
-				
 
 				// if there is no current entry, add a select entry as default
-				if (!$this->structure[$fieldname]["defaultname"] && !$autoselect)
+				if ((!isset($this->structure[$fieldname]["defaultname"]) || ($this->structure[$fieldname]["defaultname"] == null)) && (!isset($autoselect) || ($autoselect == null)))
 				{
-					print "<option selected value=\"\">-- select --</option>";
+					print "<option value=\"\">-- select --</option>";
 				}
 		
 
-			
+				//echo "</select>";			
 				// add all the options
 				foreach ($this->structure[$fieldname]["values"] as $value)
 				{
+					
+					print "<option ";
+					
 					// is the current row, the one that is in use? If so, add the 'selected' tag to it
-					if ($value == $this->structure[$fieldname]["defaultvalue"])
+					if (isset($this->structure[$fieldname]["defaultvalue"]) && ($value == $this->structure[$fieldname]["defaultvalue"]))
 					{
-						print "<option selected ";
-					}
-					else
-					{
-						print "<option ";
+						print "selected='selected' ";
 					}
 					
 					print "value=\"$value\">" . $translations[$value] ."</option>";
@@ -860,16 +1249,30 @@ class form_input
 				print "</select>";
 
 				// optional label/description
-				print $this->structure[$fieldname]["options"]["label"];			
+				if (isset($this->structure[$fieldname]["options"]["label"]))
+				{
+					print $this->structure[$fieldname]["options"]["label"];
+				}
 			break;
 
 			case "submit":
 				$translation = language_translate_string($this->language, $this->structure[$fieldname]["defaultvalue"]);
 
-				print "<input name=\"$fieldname\" type=\"submit\" value=\"$translation\">";
+				print "<input name=\"$fieldname\" type=\"submit\" value=\"$translation\"";
+				
+				if ($this->structure[$fieldname]["options"]["disabled"] == "yes")
+					print "disabled=\"disabled\" ";
+					
+				print ">";
 			break;
 
 			case "message":
+
+				// sometimes message data is coming directly out of the SQL database, we should run HTML entities
+				// conversion on it.
+				$this->structure[$fieldname]["defaultvalue"]	= nl2br($this->structure[$fieldname]["defaultvalue"]);
+				//$this->structure[$fieldname]["defaultvalue"]	= htmlentities($this->structure[$fieldname]["defaultvalue"]);
+
 				print $this->structure[$fieldname]["defaultvalue"];
 			break;
 
@@ -878,13 +1281,28 @@ class form_input
 				$upload_maxbytes = format_size_human( sql_get_singlevalue("SELECT value FROM config WHERE name='UPLOAD_MAXBYTES'") );
 
 				// optional prefix label/description
-				print $this->structure[$fieldname]["options"]["prelabel"];
+				if (isset($this->structure[$fieldname]["options"]["prelabel"]))
+				{
+					print $this->structure[$fieldname]["options"]["prelabel"];
+				}
 
 				// input field
-				print "<input type=\"file\" name=\"$fieldname\"> <i>Note: File must be no larger than $upload_maxbytes.</i>";
+				print "<input type=\"file\" name=\"$fieldname\"";
+				if (isset($this->structure[$fieldname]["options"]["disabled"]) && ($this->structure[$fieldname]["options"]["disabled"] == "yes"))
+					print "disabled=\"disabled\" ";
+					
+				if (isset($this->structure[$fieldname]["options"]["css_field_class"]))	
+				{
+					print "class=\"". $this->structure[$fieldname]["options"]["css_field_class"] ."\" ";
+				}			
+					
+				print "> <i>Note: File must be no larger than $upload_maxbytes.</i>";
 
 				// optional label/description
-				print $this->structure[$fieldname]["options"]["label"];
+				if (isset($this->structure[$fieldname]["options"]["label"]))
+				{
+					print $this->structure[$fieldname]["options"]["label"];
+				}
 			break;
 
 			default:
@@ -897,25 +1315,36 @@ class form_input
 
 
 	/*
-		render_actionsdefault()
+		render_javascript()
 
-		Processes all the javascript actions for the defaultvalue selections
+		For a number of form capabilities such as autocomplete of dropdowns and show/hide
+		javascript actions, the framework needs to output javascript to go along with the
+		form items.
+
+		We do that there, in the render_javascript function.
+
 	*/
-	function render_actionsdefault()
+	function render_javascript()
 	{
-		log_debug("form", "Executing render_actiondefault()");
+		log_debug("form", "Executing render_javascript()");
+
 
 
 		print "<script type=\"text/javascript\">";
 
 		foreach (array_keys($this->structure) as $fieldname)
 		{
-			// if actions enabled, configure all the actions that have been defined
-			if ($this->actions[$fieldname])
+			/*
+				If any actions have been defined, process them
+			*/
+
+			if (!empty($this->actions[$fieldname]))
 			{
+				log_debug("form", "Processing action rules for $fieldname field");
+
 				foreach (array_keys($this->actions[$fieldname]) as $target_field)
 				{
-					if ($this->actions[$fieldname][ $target_field ][ $this->structure[$fieldname]["defaultvalue"] ])
+					if (isset($this->structure[$fieldname]["defaultvalue"]) && !empty($this->actions[$fieldname][ $target_field ][ $this->structure[$fieldname]["defaultvalue"] ]))
 					{
 						$action = $this->actions[$fieldname][ $target_field ][ $this->structure[$fieldname]["defaultvalue"] ];
 					}
@@ -936,6 +1365,49 @@ class form_input
 					}
 				}
 			}
+
+
+			/*
+				If the form type is input and has autocomplete, set a javascript value
+				for the autocomplete feature.
+			*/
+
+			if (!empty($this->structure[ $fieldname ]["options"]["autocomplete"]) && $this->structure[ $fieldname ]["type"] == "input")
+			{
+				log_write("debug", "form", "Setting autocomplete dropdown values for form field $fieldname");
+
+				$values = array();
+
+				// load autocomplete data from SQL query
+				if ($this->structure[ $fieldname ]["options"]["autocomplete"] == "sql")
+				{
+					log_write("debug", "form", "Fetching autocomplete data from SQL database");
+
+					$sql_obj		= New sql_query;
+					$sql_obj->string	= $this->structure[ $fieldname ]["options"]["autocomplete_sql"];
+					$sql_obj->execute();
+
+
+					if ($sql_obj->num_rows())
+					{
+						$sql_obj->fetch_array();
+						
+						foreach ($sql_obj->data as $data_row)
+						{
+							$values[]	= $data_row["label"];
+						}
+					}
+				}
+				
+
+				// write javascript for autocomplete options
+				print "$(function() {\n";
+					print "\tvar autocomplete_$fieldname = [". format_arraytocommastring($values, '"') ."];\n";
+					print "\t$(\"#$fieldname\").autocomplete({\n";
+					print "\tsource: autocomplete_$fieldname\n";
+					print "\t});\n";
+				print "});\n";											
+			}
 		}
 
 
@@ -955,7 +1427,7 @@ class form_input
 	
 		if (!$this->action || !$this->method)
 		{
-			print "Warning: No form action or method defined for form class<br>";
+			log_write("warning", "inc_form", "No form action or method defined for form class");
 		}
 
 
@@ -978,10 +1450,12 @@ class form_input
 
 		// draw each sub form
 		$num_subforms = count(array_keys($this->subforms));
-		$count;
+		$count = 0;
 		
 		foreach (array_keys($this->subforms) as $form_label)
 		{
+			log_write("debug", "inc_form", "Processing subform: $form_label");
+
 			$count++;
 			
 			if ($form_label == "hidden")
@@ -1004,10 +1478,135 @@ class form_input
 				print "<td colspan=\"2\"><b>". language_translate_string($this->language, $form_label) ."</b></td>";
 				print "</tr>";
 
-				// display all the rows
-				foreach ($this->subforms[$form_label] as $fieldname)
+
+				// standard vs grouped subform
+				if ($this->subforms_grouped[$form_label])
 				{
-					$this->render_row($fieldname);
+					log_write("debug", "inc_form", "Subform $form_logic is grouped - running additional logic");
+
+					/*
+						Grouped subforms add additional logic to Amberphplib - a subform can be defined as normal
+						with a placeholder fieldname.
+
+						This placeholder then matches to a subforms_grouped configuration that defines that fields
+						should belong to that group - once added, when the form is drawn, any fields that are grouped
+						will be drawn on a single row.
+
+						This feature is ideal for drawing complex charts/table-like forms without having to write
+						custom rendering code every time.
+
+						eg:
+						$obj_form->subforms["example"] 				= array("group1", "group2", "notgrouped");
+						$obj_form->subforms_grouped["example"]["group1"] 	= array("standard_field1", "standard_field2");
+						$obj_form->subforms_grouped["example"]["group2"] 	= array("standard_field3", "standard_field4");
+					*/
+
+
+					$grouped_counter = 0;
+
+					foreach ($this->subforms[$form_label] as $fieldname)
+					{
+
+						if (isset($this->subforms_grouped[$form_label][$fieldname]))
+						{
+							/*
+								We have determined that $fieldname is a grouped field - from here, we
+								now loop through and put grouped fields together.
+								
+								We track the table status with $grouped_counter, if we run into a regular
+								field, we close the table, process that field and then restume the table for
+								the next block of grouped fields.
+
+								eg:
+										/---------------------\
+									group1: |  field1  |  field2  |
+									group2: |  field1  |  field2  |
+										\---------------------/
+
+										/---------------------\
+										| normal_field ...... |
+										\---------------------/
+									
+										/---------------------\
+									group3: |  field4  |  field5  |
+										\---------------------/
+
+
+								TODO: There is a limitation to be cautious of, the logic here does not count
+									the number of columns to make sure all groups in the subform are the
+									same length.
+
+									General rule: don't mess with the number of columns - OR make sure there
+									is a regular field between them to cause the table to be re-drawn.
+							*/
+
+							log_write("debug", "inc_form", "Processing field $fieldname as a group field");
+
+							// container table
+							if ($grouped_counter == 0)
+							{
+								print "<tr>";
+								print "<td colspan=\"2\">";
+								print "<table class=\"table_highlight\">";
+
+								$grouped_counter = 1;
+							}
+
+							// grouped field
+							$num_fields = count ($this->subforms_grouped["domain_records"][$fieldname]);
+
+
+							// run through group members
+							print "<tr>";
+
+							foreach ($this->subforms_grouped["domain_records"][$fieldname] as $fieldname2)
+							{
+								// render field
+								print "<td>";
+								$this->render_field($fieldname2);
+								print "</td>";
+							}
+
+							print "</tr>";
+
+						}
+						else
+						{
+							if ($grouped_counter == 1)
+							{
+								// close container table
+								print "</table>";
+								print "</td></tr>";
+
+								$grouped_counter = 0;
+							}
+
+							// display row as normal
+							log_write("debug", "inc_form", "Processing field $fieldname as a regular field");
+
+							$this->render_row($fieldname);
+						}
+
+					}
+
+					if ($grouped_counter == 1)
+					{
+						// close container table
+						print "</table>";
+						print "</td></tr>";
+
+						$grouped_counter = 0;
+					}
+				}
+				else
+				{
+					log_write("debug", "inc_form", "Form subgroup $form_label is not grouped");
+
+					// display all the rows
+					foreach ($this->subforms[$form_label] as $fieldname)
+					{
+						$this->render_row($fieldname);
+					}
 				}
 
 				// end table
@@ -1022,9 +1621,9 @@ class form_input
 
 		// end form
 		print "</form>";
-	
-		// execute javascript default actions
-		$this->render_actionsdefault();
+
+		// render javascript components
+		$this->render_javascript();
 	}
 
 
@@ -1035,6 +1634,47 @@ class form_input
 /*
 	Standalone Functions
 */
+
+/*
+ 	form_helper_prepare_dropdownfromobj($fieldname, $sql_obj)
+
+	The function generates the relevant structure needed to add a drop down
+	to a form (or the option form for a table based on the values provided from
+	the SQL object.
+	
+	Sets a flag to prevent SQL from being queried until render time, so that
+	default values can be accounted for.
+	
+	Will replace the key CURRENTID with the default value at render time.
+	
+	Returns the structure array, which can then be passed directly to form::add_input
+ */
+
+function form_helper_prepare_dropdownfromobj($fieldname, $sql_obj)
+{
+	log_debug("form", "Executing form_helper_prepare_dropdownfromdb($fieldname, sql_obj)");
+	
+	$sql_obj->generate_sql();
+	
+	
+	//if CURRENTID key doesn't exist, proceed as usual
+	if (strpos($sql_obj->string, "CURRENTID") === FALSE)
+	{
+		$structure = form_helper_prepare_valuesfromdb($sql_obj->string);
+	}
+	
+	//otherwise, set as string so query is executed at render time
+	else
+	{
+		$structure["values"]		= $sql_obj->string;
+	}
+	
+	$structure["fieldname"]		= $fieldname;
+	$structure["type"]		= "dropdown";
+
+	return $structure;
+}
+
 
 
 /*
@@ -1144,39 +1784,54 @@ function form_helper_prepare_valuesfromdb($sqlquery)
 {
 	log_debug("form", "Executing form_helper_prepare_valuesfromdb($sqlquery)");
 	
-	$sql_obj		= New sql_query;
-	$sql_obj->string	= $sqlquery;
-	
-	$sql_obj->execute();
-	
-	if ($sql_obj->num_rows())
+
+	// fetch from cache (if it exists)
+	if (isset($GLOBALS["cache"]["form_sql"][$sqlquery]))
 	{
-		$sql_obj->fetch_array();
-		foreach ($sql_obj->data as $data)
+		log_write("debug", "form", "Fetching form DB results from cache");
+
+		return $GLOBALS["cache"]["form_sql"][$sqlquery];
+	}
+	else
+	{
+		// fetch data from SQL DB
+		$sql_obj		= New sql_query;
+		$sql_obj->string	= $sqlquery;
+		
+		$sql_obj->execute();
+		
+		if ($sql_obj->num_rows())
 		{
-
-			// merge multiple labels into a single label
-			$label = $data["label"];
-
-			for ($i=0; $i < count(array_keys($data)); $i++)
+			$sql_obj->fetch_array();
+			foreach ($sql_obj->data as $data)
 			{
-				if ($data["label$i"])
+
+				// merge multiple labels into a single label
+				$label = $data["label"];
+
+				for ($i=0; $i < count(array_keys($data)); $i++)
 				{
-					$label .= " -- ". $data["label$i"];
+					if (!empty($data["label$i"]))
+					{
+						$label .= " -- ". $data["label$i"];
+					}
+				}
+				
+
+				// only add an option if there is an id and label for it
+				if ($data["id"] && $label)
+				{
+					$structure["values"][]				= $data["id"];
+					$structure["translations"][ $data["id"] ]	= $label;
 				}
 			}
-			
 
-			// only add an option if there is an id and label for it
-			if ($data["id"] && $label)
-			{
-				$structure["values"][]				= $data["id"];
-				$structure["translations"][ $data["id"] ]	= $label;
-			}
+			// save structure to cache
+			$GLOBALS["cache"]["form_sql"][$sqlquery] = $structure;
+
+			// return the structure
+			return $structure;
 		}
-
-		// return the structure
-		return $structure;
 	}
 
 	return 0;

@@ -47,8 +47,8 @@ function config_generate_uniqueid($config_name, $check_sql)
 	
 	$config_name = strtoupper($config_name);
 	
-	$returnvalue	= 0;
-	$uniqueid	= 0;
+	$returnvalue = 0;
+	$uniqueid = 0;
 	
 
 	// fetch the starting ID from the config DB
@@ -56,7 +56,18 @@ function config_generate_uniqueid($config_name, $check_sql)
 
 	if (!$uniqueid)
 		die("Unable to fetch $config_name value from config database");
+	
+	// first set the uniqueid prefix to an empty string, in case the following tests fail	
+	$uniqueid_prefix = '';
+	
+	if (!is_numeric($uniqueid))
+	{
+		preg_match("/^(\S*?)([0-9]*)$/", $uniqueid, $matches);
 
+		$uniqueid_prefix	= $matches[1];
+		$uniqueid		= (int)$matches[2];
+	}
+	
 
 	if ($check_sql)
 	{
@@ -64,7 +75,7 @@ function config_generate_uniqueid($config_name, $check_sql)
 		while ($returnvalue == 0)
 		{
 			$sql_obj		= New sql_query;
-			$sql_obj->string	= str_replace("VALUE", $uniqueid, $check_sql);
+			$sql_obj->string	= str_replace("VALUE", $uniqueid_prefix.$uniqueid, $check_sql);
 			$sql_obj->execute();
 
 			if ($sql_obj->num_rows())
@@ -78,11 +89,12 @@ function config_generate_uniqueid($config_name, $check_sql)
 				$returnvalue = $uniqueid;
 			}
 		}
+		$returnvalue = $uniqueid_prefix.$returnvalue;
 	}
 	else
 	{
 		// conducting no DB checks.
-		$returnvalue = $uniqueid;
+		$returnvalue = $uniqueid_prefix.$uniqueid;
 	}
 	
 
@@ -90,7 +102,7 @@ function config_generate_uniqueid($config_name, $check_sql)
 	$uniqueid++;
 				
 	$sql_obj		= New sql_query;
-	$sql_obj->string	= "UPDATE config SET value='$uniqueid' WHERE name='$config_name'";
+	$sql_obj->string	= "UPDATE config SET value='{$uniqueid_prefix}{$uniqueid}' WHERE name='$config_name'";
 	$sql_obj->execute();
 
 
@@ -98,6 +110,79 @@ function config_generate_uniqueid($config_name, $check_sql)
 }
 
 
+/* ARRAY FUNCTIONS */
+
+
+/*;
+	array_insert_after
+	
+	Inserts an array into another array after a certain key
+	http://stackoverflow.com/questions/1783089/array-splice-for-associative-arrays/1783125#1783125
+
+	Values
+	input		array
+	key		key you want to splice 
+	array		Filename or path
+
+	Returns
+	array		results
+*/
+function array_insert_after($input, $key, $segment)
+{
+	log_debug("inc_misc", "Executing array_insert_after($input, $key, $segment)");
+
+
+	// TODO: what exactly does this comment mean? we are inserting at 0?
+	// Insert at offset 2
+	$offset = 0;
+	
+	foreach($input as $array_key => $values)
+	{
+		$offset++;
+		if($key == $array_key) 
+		{
+			break;
+		}
+	} 
+	log_debug("misc", "Inserting data into array after $key, offset $offset");
+	
+	
+	$output = array_slice($input, 0, $offset, true) +
+	$segment +
+	array_slice($input, $offset, NULL, true);
+	
+	
+	return $output;
+}
+
+
+/*
+	derive_installation_url
+
+	Returns the URL of the root of the Amberphplib-based application, typically needed
+	for features such as RSS feeds.
+
+	Returns
+	string		Application root URL path
+*/
+
+function derive_installation_url()
+{
+	if($_SERVER['HTTPS'])
+	{
+		$protocol = "https://";
+	}
+	else
+	{
+		$protocol = "http://";
+	} 
+	
+	$server_name	= $_SERVER['SERVER_NAME'];
+	$script_dirname	= dirname($_SERVER['SCRIPT_NAME']);
+
+	return $protocol.$server_name.$script_dirname."/"; 
+
+}
 
 
 
@@ -138,9 +223,9 @@ function format_file_extension($filename)
 */
 function format_file_name($filepath)
 {
-	log_debug("misc", "Executing format_file_name($filename)");
+	log_debug("misc", "Executing format_file_name($filepath)");
 
-	return substr(strrchr($filename,"/"),1);
+	return substr(strrchr($filepath,"/"),1);
 }
 
 
@@ -278,6 +363,7 @@ function format_size_bytes($string)
 	Supported types:
 	important
 	info
+	bubble
 */
 function format_msgbox($type, $text)
 {
@@ -328,12 +414,13 @@ function format_linkbox($type, $hyperlink, $text)
 function format_money($amount, $nocurrency = NULL)
 {
 	log_debug("misc", "Executing format_money($amount)");
-
-	// 2 decimal places
-	$amount = sprintf("%0.2f", $amount);
+	
+	//get separators
+	$thousands	= $GLOBALS["config"]["CURRENCY_DEFAULT_THOUSANDS_SEPARATOR"];
+	$decimal	= $GLOBALS["config"]["CURRENCY_DEFAULT_DECIMAL_SEPARATOR"];
 
 	// formatting for readability
-	$amount = number_format($amount, "2", ".", ",");
+	$amount 	= number_format($amount, "2", $decimal, $thousands);
 
 
 	if ($nocurrency)
@@ -343,15 +430,15 @@ function format_money($amount, $nocurrency = NULL)
 	else
 	{
 		// add currency & return
-		$position = sql_get_singlevalue("SELECT value FROM config WHERE name='CURRENCY_DEFAULT_SYMBOL_POSITION'");
+		$position = $GLOBALS["config"]["CURRENCY_DEFAULT_SYMBOL_POSITION"];
 
 		if ($position == "after")
 		{
-			$result = "$amount ". sql_get_singlevalue("SELECT value FROM config WHERE name='CURRENCY_DEFAULT_SYMBOL'");
+			$result = "$amount ". $GLOBALS["config"]["CURRENCY_DEFAULT_SYMBOL"];
 		}
 		else
 		{
-			$result = sql_get_singlevalue("SELECT value FROM config WHERE name='CURRENCY_DEFAULT_SYMBOL'") ."$amount";
+			$result = $GLOBALS["config"]["CURRENCY_DEFAULT_SYMBOL"] ."$amount";
 		}
 
 		return $result;
@@ -364,10 +451,17 @@ function format_money($amount, $nocurrency = NULL)
 
 	returns a provided array as a comma seporated string - very useful for creating value
 	lists to be used in a SQL query.
+
+	Fields
+	array		Array of data.
+	encase		(optional) surrond each value with the char - eg set to " to have a list like "optionA", "optionB", created.
+
+	Returns
+	string		Formatted string
 */
-function format_arraytocommastring($array)
+function format_arraytocommastring($array, $encase = NULL)
 {
-	log_debug("misc", "Executing format_arraytocommastring(Array)");
+	log_write("debug", "misc", "Executing format_arraytocommastring(Array, $encase)");
 
 	$returnstring = "";
 
@@ -375,7 +469,7 @@ function format_arraytocommastring($array)
 
 	for ($i=0; $i < $array_num; $i++)
 	{
-		$returnstring .= $array[$i];
+		$returnstring .= $encase . $array[$i] . $encase;
 
 		if ($i != ($array_num - 1))
 		{
@@ -399,11 +493,77 @@ function format_arraytocommastring($array)
 function time_date_to_timestamp($date)
 {
 	log_debug("misc", "Executing time_date_to_timestamp($date)");
-	
-	$date_a = split("-", $date);
 
-	return mktime(0, 0, 0, $date_a[1], $date_a[2] , $date_a[0]);
+
+	if ($date == "0000-00-00")
+	{
+		// feeding 0000-00-00 to mktime would cause an incorrect timedstamp to be generated
+		return 0;
+	}
+	else
+	{
+		$date_a = explode("-", $date);
+
+		return mktime(0, 0, 0, $date_a[1], $date_a[2] , $date_a[0]);
+	}
 }
+
+
+/*
+	time_bind_to_seconds($bindtime)
+
+	Converts bind formatted time strings into seconds.
+
+	Values
+	bindtime	Format of:
+			#S == seconds
+			#M == minutes	60 seconds
+			#H == Hours	3600 seconds
+			#D == Days	86400 seconds
+			#W == Weeks	604800 seconds
+
+	Returns
+	int		number of seconds
+*/
+
+function time_bind_to_seconds($bindtime)
+{
+	log_write("debug", "misc", "Executing time_bind_to_seconds($bindtime)");
+
+	$bindtime = strtoupper($bindtime);
+
+	// this works by multiplying by the appropate amount and converting
+	// to an integer to strip the alpha characters.
+	//
+	switch (substr($bindtime, -1))
+	{
+		case "M":
+			$bindtime = intval($bindtime) * 60;
+		break;
+
+		case "H":
+			$bindtime = intval($bindtime) * 3600;
+		break;
+
+		case "D":
+			$bindtime = intval($bindtime) * 86400;
+		break;
+
+		case "W":
+			$bindtime = intval($bindtime) * 604800;
+		break;
+
+		case "S":
+		default:
+			intval($bindtime);
+		break;
+	}
+
+	return $bindtime;
+
+} // end of time_bind_to_seconds
+
+
 
 
 /*
@@ -437,7 +597,7 @@ function time_format_hourmins($seconds)
 	Provides a date formated in the user's perferred way. If no date is provided, will return the current date.
 
 	Values
-	date		Format YYYY-MM-DD (optional)
+	date		Format YYYY-MM-DD OR unix timestamp (optional)
 
 	Returns
 	string		Date in human-readable format.
@@ -448,13 +608,21 @@ function time_format_humandate($date = NULL)
 
 	if ($date)
 	{
-		// convert date to timestamp so we can work with it
-		$timestamp = time_date_to_timestamp($date);
+		if (preg_match("/^[0-9]*$/", $date))
+		{
+			// already a timestamp, yay!
+			$timestamp = $date;
+		}
+		else
+		{
+			// convert date to timestamp so we can work with it
+			$timestamp = time_date_to_timestamp($date);
+		}
 	}
 	else
 	{
 		// no date supplied - generate current timestamp
-		$timestamp = mktime();
+		$timestamp = time();
 	}
 
 
@@ -488,6 +656,7 @@ function time_format_humandate($date = NULL)
 		break;
 	}
 }
+
 
 
 /*
@@ -532,7 +701,7 @@ function time_calculate_daysofweek($date_selected_start)
 	$days = array();
 
 	// get the start day, month + year
-	$dates = split("-", $date_selected_start);
+	$dates = explode("-", $date_selected_start);
 	
 	// get the value for all the days
 	for ($i=0; $i < 7; $i++)
@@ -678,7 +847,7 @@ function time_calculate_monthdate_last($date = NULL)
 
 	if (!$date)
 	{
-		$timestamp	= mktime();
+		$timestamp	= time();
 		$date		= date("Y-m-d", $timestamp);
 	}
 	else
@@ -709,7 +878,7 @@ function time_calculate_monthdate_last($date = NULL)
 
 function helplink($id)
 {
-	return "<a href=\"help/viewer.php?id=$id\" target=\"new\" title=\"Click here for a popup help box\"><img src=\"images/icons/help.gif\" alt=\"?\" border=\"0\"></a>";
+	return "<a href=\"javascript:url_new_window_minimal('help/viewer.php?id=$id');\" title=\"Click here for a popup help box\"><img src=\"images/icons/help.gif\" alt=\"?\" border=\"0\"></a>";
 }
 
 
@@ -727,8 +896,8 @@ function log_error_render()
 {
         if ($_SESSION["error"]["message"])
         {
-		print "<table cellpadding=\"0\" cellspacing=\"0\" border=\"0\" width=\"100%\">";
-                print "<tr><td bgcolor=\"#ffeda4\" style=\"border: 1px dashed #dc6d00; padding: 3px;\">";
+		print "<table class=\"error_table\">";
+                print "<tr><td class=\"error_td\">";
                 print "<p><b>Error:</b><br><br>";
 
 		foreach ($_SESSION["error"]["message"] as $errormsg)
@@ -750,10 +919,10 @@ function log_error_render()
 */
 function log_notification_render()
 {
-        if ($_SESSION["notification"]["message"] && !$_SESSION["error"]["message"])
+        if (isset($_SESSION["notification"]["message"]) && !isset($_SESSION["error"]["message"]))
         {
-		print "<table cellpadding=\"0\" cellspacing=\"0\" border=\"0\" width=\"100%\">";
-                print "<tr><td bgcolor=\"#c7e8ed\" style=\"border: 1px dashed #374893; padding: 3px;\">";
+		print "<table class=\"notification_table\">";
+                print "<tr><td class=\"notification_td\">";
                 print "<p><b>Notification:</b><br><br>";
 		
 		foreach ($_SESSION["notification"]["message"] as $notificationmsg)
@@ -884,9 +1053,9 @@ function file_generate_name($basename, $extension = NULL)
 
 	// calculate a temporary filename
 	$uniqueid = 0;
-	while ($complete == "")
+	while (!isset($complete) || ($complete == ""))
 	{
-		$filename = $basename ."_". mktime() ."_$uniqueid" . $extension;
+		$filename = $basename ."_". time() ."_$uniqueid" . $extension;
 
 		if (file_exists($filename))
 		{
@@ -1015,9 +1184,9 @@ function dir_generate_name($basename)
 
 	// calculate a temporary directory name
 	$uniqueid = 0;
-	while ($complete == "")
+	while (!isset($complete) || $complete == "")
 	{
-		$dirname = $basename ."_". mktime() ."_$uniqueid";
+		$dirname = $basename ."_". time() ."_$uniqueid";
 
 		if (file_exists($dirname))
 		{
@@ -1104,5 +1273,109 @@ function dir_list_contents($directory='.')
 
 	return $files;
 }
+
+
+
+
+/*
+	IPv4 Networking Functions
+*/
+
+
+/*
+	ipv4_subnet_members
+
+	Returns an array of all IP addresses in the provided subnet
+
+	TODO/IMPORTANT: This function has been found to sometimes do unexpected weirdness with
+			versions of PHP older than 5.3.0, this should be investigated in more detail
+			and a version check or version-specific workaround to be implemented.
+
+	Fields
+	address_with_cidr	IP and subnet in CIDR notation (eg: 192.168.0.0/24)
+	include_network		(optional, default == FALSE) Return the network and broadcast addresses too.
+
+	Returns
+	0		Failure
+	array		Array of all IPs belonging to subnet
+*/
+
+function ipv4_subnet_members($address_with_cidr, $include_network = FALSE)
+{
+	log_write("debug", "inc_misc", "Executing ipv4_subnet_members($address_with_cidr, $include_network)");
+
+	$address = explode('/', $address_with_cidr);			// eg: 192.168.0.0/24
+
+
+	// calculate subnet mask
+	$bin = NULL;
+
+	for ($i = 1; $i <= 32; $i++)
+	{
+		$bin .= $address[1] >= $i ? '1' : '0';
+	}
+
+	// calculate key values
+	$long_netmask	= bindec($bin);					// eg: 255.255.255.0
+	$long_network	= ip2long($address[0]);				// eg: 192.168.0.0
+	$long_broadcast	= ($long_network | ~($long_netmask));		// eg: 192.168.0.255
+
+
+	// run through the range and generate all possible IPs
+	// do not include mask/network IPs
+	$return = array();
+
+	if ($include_network)
+	{
+		// include network ranges
+		for ($i = $long_network; $i <= $long_broadcast; $i++)
+		{
+			$return[] = long2ip($i);
+		}
+	}
+	else
+	{
+		// include network ranges
+		for ($i = ($long_network + 1); $i < $long_broadcast; $i++)
+		{
+			$return[] = long2ip($i);
+		}
+	}
+
+	return $return;
+
+} // end of ipv4_subnet_members
+
+
+
+
+/*
+	ipv4_convert_arpa
+
+	Converts the provided IPv4 address into the arpa format typically
+	used for reverse DNS.
+
+	Fields
+	ipaddress
+
+	Returns
+	0		Invalid IP address
+	string		apra format eg 0.168.192.in-addr.arpa
+*/
+
+function ipv4_convert_arpa( $ipaddress )
+{
+	log_write("debug", "inc_misc", "Executing ipv4_convert_arpa( $ipaddress )");
+
+	$tmp_network = explode(".", $ipaddress);
+
+	$result = $tmp_network[2] .".". $tmp_network[1] .".". $tmp_network[0] .".in-addr.arpa";
+
+	return $result;
+
+} // end of ipv4_convert_arpa
+
+
+
 
 ?>
