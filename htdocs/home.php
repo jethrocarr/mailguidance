@@ -69,7 +69,7 @@ else
 			}
 			else
 			{
-				format_msgbox("green", "<p><img src=\"images/icons/tick_16.gif\"> Any emails maching the filters for your user, will be delivered to your mailbox.</p>");
+				format_msgbox("open", "<p><img src=\"images/icons/tick_16.gif\"> Any emails maching the filters for your user, will be delivered to your mailbox.</p>");
 			}
 
 
