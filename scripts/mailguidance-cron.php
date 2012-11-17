@@ -369,10 +369,28 @@ switch ($config["mail_default_mode"])
 
 log_debug("main", "Writing .procmailrc file");
 
-
-if (!$fh = fopen($_ENV["HOME"] ."/.procmailrc", "w"))
+if (!empty($_SERVER["HOME"]))
 {
-	log_write("error", "main", "Unable to open file ". $_ENV["HOME"] ."/.procmailrc for writing");
+	$home_dir = $_SERVER["HOME"];
+}
+elseif (!getenv("HOME"))
+{
+	$home_dir = getenv("HOME");
+}
+elseif (!empty($_ENV["HOME"]))
+{
+	$home_dir = $_ENV["HOME"];
+}
+else
+{
+	// guess and use default home path
+	$home_dir = "~/test";
+}
+
+
+if (!$fh = fopen("$home_dir/.procmailrc", "w"))
+{
+	log_write("error", "main", "Unable to open file $home_dir/.procmailrc for writing");
 	exit(1);
 }
 
